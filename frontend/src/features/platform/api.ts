@@ -136,7 +136,7 @@ const fallbackFinanceSummary: FeeSummary = {
   outstandingBalance: 23500
 };
 
-const fallbackOutstanding = {
+const fallbackOutstanding: OutstandingSummary = {
   studentId: mockStudentId,
   totalOutstanding: 1800,
   invoices: [
@@ -147,6 +147,11 @@ const fallbackOutstanding = {
 const fallbackNotifications: NotificationItem[] = [
   { id: "not-1", recipientUserId: mockParentId, channel: "IN_APP", status: "PENDING", subject: "Fee Reminder", content: "Invoice for second term is outstanding." },
   { id: "not-2", recipientUserId: mockStudentId, channel: "IN_APP", status: "SENT", subject: "Exam Schedule", content: "Midterm exams begin on Monday." }
+];
+
+const fallbackPayments: PaymentHistoryItem[] = [
+  { id: "pay-1", invoiceId: mockInvoiceId, studentId: mockStudentId, amount: 1200, reference: "PAY-2026-001" },
+  { id: "pay-2", invoiceId: "invoice-2", studentId: mockStudentId, amount: 800, reference: "PAY-2026-002" }
 ];
 
 const fallbackMessages: MessageItem[] = [
@@ -287,6 +292,26 @@ export interface FeeSummary {
   totalInvoiced: number;
   totalCollected: number;
   outstandingBalance: number;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  invoiceId: string;
+  studentId: string;
+  amount: number;
+  reference: string;
+}
+
+export interface OutstandingSummary {
+  studentId: string;
+  totalOutstanding: number;
+  invoices: Array<{
+    id: string;
+    studentId: string;
+    feeStructureId: string;
+    amount: number;
+    status: string;
+  }>;
 }
 
 export interface NotificationItem {
@@ -486,7 +511,11 @@ export function recordPayment(
 }
 
 export function fetchOutstanding(session: Session, studentId: string) {
-  return withFallback(() => apiRequest({ path: `/finance/students/${studentId}/outstanding`, ...auth(session) }), fallbackOutstanding);
+  return withFallback(() => apiRequest<OutstandingSummary>({ path: `/finance/students/${studentId}/outstanding`, ...auth(session) }), fallbackOutstanding);
+}
+
+export function fetchPaymentHistory(session: Session, studentId: string) {
+  return withFallback(() => apiRequest<PaymentHistoryItem[]>({ path: `/finance/students/${studentId}/payments`, ...auth(session) }), fallbackPayments);
 }
 
 export function fetchFinanceSummary(session: Session) {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AuthPanel } from "./components/auth/AuthPanel";
 import { DashboardApp } from "./components/dashboard/DashboardApp";
+import { PublicContactPage } from "./components/public/PublicContactPage";
 import { LandingPage } from "./components/public/LandingPage";
 import { PlanOnboardingPage } from "./components/public/PlanOnboardingPage";
 import { PublicDetailPage } from "./components/public/PublicDetailPage";
@@ -10,12 +11,14 @@ import { useAuthStore } from "./store/auth";
 type AppRoute =
   | { kind: "landing"; path: "/" }
   | { kind: "login"; path: "/login" }
+  | { kind: "contact"; path: string; email?: string }
   | { kind: "dashboard"; path: "/dashboard" }
   | { kind: "detail"; path: string; slug: DetailSlug }
   | { kind: "onboarding"; path: string; plan: PlanSlug };
 
 function parseRoute(pathname: string): AppRoute {
   if (pathname === "/login") return { kind: "login", path: "/login" };
+  if (pathname === "/contact-sales") return { kind: "contact", path: "/contact-sales" };
   if (pathname === "/dashboard") return { kind: "dashboard", path: "/dashboard" };
 
   const detailMatch = pathname.match(/^\/details\/([a-z-]+)$/);
@@ -40,17 +43,11 @@ function navigate(path: string, replace = false) {
 
 function SignInPage({ onBack }: { onBack: () => void }) {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(194,65,12,0.18),transparent_26%),linear-gradient(180deg,#f7efe3_0%,#f2e3ca_100%)] p-4 md:p-6">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-7xl items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="rounded-[2.5rem] bg-ink px-8 py-10 text-sand shadow-2xl shadow-black/20 md:px-10">
-          <p className="text-xs uppercase tracking-[0.45em] text-sand/55">Private access</p>
-          <h1 className="mt-5 font-display text-5xl leading-tight md:text-6xl">School operations belong behind the dashboard.</h1>
-          <p className="mt-6 max-w-xl text-base leading-7 text-sand/75">
-            Super admins create schools. School admins invite staff, students, and parents from inside their tenant.
-            Public self-registration is intentionally disabled.
-          </p>
-        </section>
-        <AuthPanel onBack={onBack} />
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(194,65,12,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(17,24,39,0.12),transparent_22%),linear-gradient(180deg,#f8f5ef_0%,#efe3cf_100%)] p-4 md:p-6">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl items-center justify-center">
+        <div className="flex justify-center">
+          <AuthPanel onBack={onBack} />
+        </div>
       </div>
     </div>
   );
@@ -90,14 +87,25 @@ export default function App() {
       setRoute({ kind: "login", path: "/login" });
     };
 
+    const goContactSales = (email?: string) => {
+      navigate("/contact-sales", false);
+      setRoute({ kind: "contact", path: "/contact-sales", email });
+    };
+
     if (route.kind === "login") {
       return <SignInPage onBack={goHome} />;
+    }
+
+    if (route.kind === "contact") {
+      return <PublicContactPage initialEmail={route.email} onBack={goHome} onLogin={goLogin} onSubmitComplete={goHome} />;
     }
 
     if (route.kind === "detail") {
       return (
         <PublicDetailPage
           onBack={goHome}
+          onContactSales={goContactSales}
+          onLogin={goLogin}
           onStartPlan={() => {
             navigate("/onboarding/growth", false);
             setRoute({ kind: "onboarding", path: "/onboarding/growth", plan: "growth" });
@@ -111,6 +119,7 @@ export default function App() {
       return (
         <PlanOnboardingPage
           onBack={goHome}
+          onContactSales={goContactSales}
           onComplete={goLogin}
           plan={route.plan}
         />
@@ -119,6 +128,7 @@ export default function App() {
 
     return (
       <LandingPage
+        onContactSales={() => goContactSales()}
         onLogin={goLogin}
         onOpenDetail={(slug) => {
           const path = `/details/${slug}`;

@@ -1,7 +1,9 @@
-import { FormEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { type DetailSlug, type PlanSlug } from "./publicContent";
+import { PublicShell } from "./PublicShell";
 
 interface LandingPageProps {
+  onContactSales: () => void;
   onLogin: () => void;
   onOpenDetail: (slug: DetailSlug) => void;
   onStartPlan: (plan: PlanSlug) => void;
@@ -27,7 +29,7 @@ const featureSets: Record<AudienceMode, FeatureCard[]> = {
   platform: [
     {
       title: "Strict school isolation",
-      body: "Every school runs inside its own tenant boundary with platform oversight and tenant-aware access.",
+      body: "Every school runs inside its own isolated workspace with platform oversight and school-aware access.",
       accent: "bg-[#eefc9c]",
       icon: "shield"
     },
@@ -39,7 +41,7 @@ const featureSets: Record<AudienceMode, FeatureCard[]> = {
     },
     {
       title: "Finance and analytics",
-      body: "Track invoices, collections, and cross-tenant performance without jumping between tools.",
+      body: "Track invoices, collections, and cross-school performance without jumping between tools.",
       accent: "bg-white",
       icon: "chart"
     },
@@ -59,7 +61,7 @@ const featureSets: Record<AudienceMode, FeatureCard[]> = {
     },
     {
       title: "Role-based team setup",
-      body: "School admins can add teachers, students, parents, and other staff from inside their tenant dashboard.",
+      body: "School admins can add teachers, students, parents, and other staff from inside their school dashboard.",
       accent: "bg-white",
       icon: "users"
     },
@@ -91,7 +93,7 @@ const planCards = [
   },
   {
     name: "Growth",
-    price: "D150 per personnel",
+    price: "D150 per student",
     tone: "bg-[#dfe8ff]",
     features: [
       "Teacher and staff management",
@@ -101,7 +103,7 @@ const planCards = [
   },
   {
     name: "Enterprise",
-    price: "Custom blended",
+    price: "Custom per student",
     tone: "bg-[#ffe3a3]",
     features: [
       "Multi-school rollout and central oversight",
@@ -114,7 +116,7 @@ const planCards = [
 const testimonials = [
   {
     stars: "5 of 5",
-    quote: "Acadex gave us one operating layer for academics, finance, and communication without losing tenant boundaries.",
+    quote: "Acadex gave us one operating layer for academics, finance, and communication without losing school boundaries.",
     name: "Janet Ceesay",
     role: "Operations Director"
   },
@@ -129,21 +131,6 @@ const testimonials = [
     quote: "Attendance, exams, fee tracking, and messaging finally feel like one product instead of a stack of disconnected tools.",
     name: "Fatou Bojang",
     role: "Academic Lead"
-  }
-];
-
-const footerGroups = [
-  {
-    title: "Platform",
-    links: ["Multi-tenant schools", "Role management", "Finance and billing", "Analytics"]
-  },
-  {
-    title: "Resources",
-    links: ["Deployment guide", "Product updates", "Support center", "Engineering notes"]
-  },
-  {
-    title: "Use cases",
-    links: ["Private schools", "Campus groups", "Growing institutions", "Platform operators"]
   }
 ];
 
@@ -189,15 +176,6 @@ function IconPhone() {
   );
 }
 
-function IconMail() {
-  return (
-    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
-      <path d="M4 6.5h16v11H4z" stroke="currentColor" strokeWidth="1.7" />
-      <path d="m5 8 7 5 7-5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-    </svg>
-  );
-}
-
 function IconCheck() {
   return (
     <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -238,14 +216,6 @@ function FeatureIcon({ name }: { name: FeatureCard["icon"] }) {
   );
 }
 
-function SocialIcon({ label }: { label: string }) {
-  return (
-    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-xs font-semibold text-ink">
-      {label}
-    </span>
-  );
-}
-
 function Avatar({ src, label }: { src: string; label: string }) {
   return (
     <span className="inline-flex h-14 w-14 overflow-hidden rounded-full border-[3px] border-white bg-ink shadow-sm">
@@ -275,105 +245,26 @@ function detailSlugFromTitle(title: string): DetailSlug {
   }
 }
 
-export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageProps) {
+export function LandingPage({ onContactSales, onLogin, onOpenDetail, onStartPlan }: LandingPageProps) {
   const [audienceMode, setAudienceMode] = useState<AudienceMode>("platform");
-  const [email, setEmail] = useState("");
-  const [emailMessage, setEmailMessage] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const featureCards = useMemo(() => featureSets[audienceMode], [audienceMode]);
 
-  function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!email.trim()) {
-      setEmailMessage("Enter a work email to continue.");
-      return;
-    }
-
-    setEmailMessage(`Thanks. We will use ${email.trim()} for your platform onboarding request.`);
-    onLogin();
-  }
-
   function handleNavClick(target: string) {
-    setMobileMenuOpen(false);
     scrollToId(target);
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(194,65,12,0.18),transparent_26%),radial-gradient(circle_at_85%_15%,rgba(17,24,39,0.12),transparent_24%),linear-gradient(180deg,#f8f5ef_0%,#efe3cf_52%,#ecddc8_100%)] text-ink">
-      <div className="w-full bg-[linear-gradient(135deg,#fbf2ea_0%,#f8f5ef_48%,#f3eee7_100%)]">
-        <header className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-5 px-6 py-6 md:px-10">
-          <button className="text-left" onClick={() => scrollToId("hero")} type="button">
-            <p className="text-xs uppercase tracking-[0.45em] text-ember/60">Acadex</p>
-            <h1 className="mt-2 hidden font-display text-3xl sm:block">School Management Cloud</h1>
-          </button>
-
-          <nav className="hidden items-center gap-8 text-sm text-black/65 lg:flex">
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                className="transition hover:text-black"
-                onClick={() => scrollToId(item.target)}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button
-              aria-expanded={mobileMenuOpen}
-              aria-label="Open menu"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white text-ink lg:hidden"
-              onClick={() => setMobileMenuOpen((open) => !open)}
-              type="button"
-            >
-              <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
-                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-              </svg>
-            </button>
-            <button
-              className="hidden rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-black/10 sm:inline-flex"
-              onClick={onLogin}
-              type="button"
-            >
-              School sign in
-            </button>
-          </div>
-        </header>
-
-        {mobileMenuOpen ? (
-          <div className="mx-6 rounded-[1.8rem] bg-white/90 p-4 shadow-lg shadow-black/5 backdrop-blur lg:hidden md:mx-10">
-            <div className="flex flex-col gap-2">
-              {navItems.map((item) => (
-                <button
-                  key={item.label}
-                  className="rounded-2xl px-4 py-3 text-left text-sm font-semibold text-black/70 transition hover:bg-black/5 hover:text-black"
-                  onClick={() => handleNavClick(item.target)}
-                  type="button"
-                >
-                  {item.label}
-                </button>
-              ))}
-              <button
-                className="mt-2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onLogin();
-                }}
-                type="button"
-              >
-                School sign in
-              </button>
-            </div>
-          </div>
-        ) : null}
-
+    <PublicShell
+      navItems={navItems.map((item) => ({ label: item.label, onClick: () => handleNavClick(item.target) }))}
+      onContactSales={onContactSales}
+      onHome={() => scrollToId("hero")}
+      onLogin={onLogin}
+    >
         <section className="border-t border-white/50" id="hero">
           <div className="mx-auto grid max-w-[1440px] gap-8 overflow-hidden px-6 py-8 md:px-10 lg:grid-cols-[0.98fr_1.02fr] lg:py-12">
             <div className="relative min-h-[420px] rounded-[2.1rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.55),rgba(255,255,255,0.16))] p-4 sm:min-h-[520px] sm:p-6 lg:min-h-[620px]">
-              <div className="absolute left-1 top-16 hidden -rotate-90 text-xs uppercase tracking-[0.35em] text-black/30 md:block">
+              <div className="absolute left-1 top-16 hidden -rotate-90 text-xs uppercase tracking-[0.35em] text-black/45 md:block">
                 Scroll down
               </div>
 
@@ -396,28 +287,28 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
               </div>
 
               <div className="absolute left-4 top-[10.5rem] z-20 w-[160px] rounded-[1.2rem] bg-white/92 p-4 shadow-xl shadow-black/10 backdrop-blur sm:left-4 sm:top-[17rem] sm:w-[210px] sm:rounded-[1.6rem] sm:p-5 md:left-6 md:top-[18rem] md:w-[220px]">
-                <p className="text-xs uppercase tracking-[0.2em] text-black/40">Attendance</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-black/55">Attendance</p>
                 <p className="mt-3 text-3xl font-semibold text-ember sm:mt-4 sm:text-4xl">96%</p>
-                <p className="mt-2 text-sm text-black/55">Daily presence across active classes</p>
+                <p className="mt-2 text-sm text-black/75">Daily presence across active classes</p>
               </div>
 
-              <div className="absolute bottom-24 left-4 right-4 hidden rounded-[1.5rem] bg-[linear-gradient(180deg,#ffffff_0%,#f8ede4_100%)] p-4 shadow-2xl shadow-black/10 sm:block sm:bottom-8 sm:left-[11rem] sm:right-auto sm:w-[300px] sm:rounded-[2rem] sm:p-5 md:left-[18.5rem] md:top-[22rem] md:bottom-auto md:w-[320px]">
+              <div className="absolute bottom-8 left-[10.5rem] hidden w-[280px] rounded-[2rem] bg-[linear-gradient(180deg,#ffffff_0%,#f8ede4_100%)] p-5 shadow-2xl shadow-black/10 lg:block xl:left-[18.5rem] xl:top-[22rem] xl:bottom-auto xl:w-[320px]">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-[0.25em] text-black/45">Operator view</p>
+                  <p className="text-xs uppercase tracking-[0.25em] text-black/60">Operator view</p>
                   <span className="rounded-full bg-moss/10 px-3 py-1 text-xs font-semibold text-moss">Live</span>
                 </div>
-                <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
+                <div className="mt-6 space-y-4">
                   <div className="rounded-2xl bg-[#fff3ea] p-4">
-                    <p className="text-sm font-semibold">New school onboarding</p>
-                    <p className="mt-1 text-sm text-black/60">Gainako Academy added with Growth plan and first school admin provisioned.</p>
+                    <p className="text-sm font-semibold">New school rollout</p>
+                    <p className="mt-1 text-sm text-black/75">Gainako Academy added with Growth plan and first school admin provisioned.</p>
                   </div>
                   <div className="rounded-2xl bg-[#f2f3f6] p-4">
                     <p className="text-sm font-semibold">Finance pulse</p>
-                    <p className="mt-1 text-sm text-black/60">$101,500 collected this term across active school tenants.</p>
+                    <p className="mt-1 text-sm text-black/75">D101,500 collected this term across active schools.</p>
                   </div>
                   <div className="rounded-2xl bg-[#edf7ea] p-4">
                     <p className="text-sm font-semibold">Teacher coverage</p>
-                    <p className="mt-1 text-sm text-black/60">36 assignments mapped to classes and subjects this week.</p>
+                    <p className="mt-1 text-sm text-black/75">36 assignments mapped to classes and subjects this week.</p>
                   </div>
                 </div>
               </div>
@@ -435,18 +326,18 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
                   ))}
                 </div>
                 <p className="mt-4 text-sm font-semibold md:text-base">8.9 platform score</p>
-                <p className="text-sm text-black/55 md:text-base">320 pilot feedback reviews</p>
+                <p className="text-sm text-black/70 md:text-base">320 pilot feedback reviews</p>
               </div>
             </div>
 
             <div className="flex flex-col justify-center">
-              <p className="text-xs uppercase tracking-[0.35em] text-ember/70">Multi-tenant school SaaS</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-ember/90">School management SaaS</p>
               <h2 className="mt-4 max-w-2xl font-display text-5xl leading-[0.98] md:text-7xl">
                 Experience school operations you can
                 <span className="text-ember"> truly control.</span>
               </h2>
-              <p className="mt-6 max-w-xl text-base leading-7 text-black/65 md:text-lg">
-                Acadex helps platform owners onboard schools, lets school admins build their teams, and keeps academics,
+              <p className="mt-6 max-w-xl text-base leading-8 text-black/80 md:text-lg">
+                Acadex helps your team roll out schools, lets school admins build their teams, and keeps academics,
                 attendance, grading, finance, and communication running from one secure system.
               </p>
 
@@ -475,12 +366,12 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
 
               <div className="mt-10 flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center">
                 <div className="flex flex-col">
-                  <span className="text-sm uppercase tracking-[0.2em] text-black/45">Built for</span>
+                  <span className="text-sm uppercase tracking-[0.2em] text-black/60">Built for</span>
                   <span className="mt-2 text-lg font-semibold">Private schools, academies, and campus groups in The Gambia</span>
                 </div>
                 <div className="hidden h-12 w-px bg-black/10 md:block" />
-                <div className="space-y-1 text-sm text-black/60">
-                  <p>Super admins add schools and assign plans</p>
+                <div className="space-y-1 text-sm text-black/75">
+                  <p>Acadex sets up schools and assigns plans</p>
                   <p>School admins add teachers, students, parents, and staff</p>
                 </div>
               </div>
@@ -491,7 +382,7 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
         <section className="mx-auto max-w-[1440px] px-6 py-12 md:px-10" id="benefits">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-black/40">Why Acadex</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-black/55">Why Acadex</p>
               <h3 className="mt-3 font-display text-4xl md:text-5xl">Why schools choose Acadex?</h3>
             </div>
             <div className="inline-flex rounded-full bg-white p-2 shadow-lg shadow-black/5">
@@ -515,11 +406,14 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {featureCards.map((card) => (
               <article key={card.title} className={`rounded-[1.8rem] p-5 shadow-lg shadow-black/5 ${card.accent}`}>
+                <div className="flex h-full min-h-[320px] flex-col">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-ink shadow-sm">
                   <FeatureIcon name={card.icon} />
                 </div>
-                <h4 className="mt-5 text-2xl font-semibold leading-tight">{card.title}</h4>
-                <p className="mt-3 text-sm leading-7 text-black/60">{card.body}</p>
+                <div className="mt-5 min-h-[68px]">
+                  <h4 className="text-2xl font-semibold leading-tight">{card.title}</h4>
+                </div>
+                <p className="mt-3 flex-1 text-sm leading-7 text-black/78">{card.body}</p>
                 <button
                   className="mt-6 rounded-full bg-white px-5 py-3 text-sm font-semibold text-black/70"
                   onClick={() => onOpenDetail(detailSlugFromTitle(card.title))}
@@ -527,6 +421,7 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
                 >
                   Learn more
                 </button>
+                </div>
               </article>
             ))}
           </div>
@@ -540,7 +435,7 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
               <div className="absolute bottom-8 left-6 h-36 w-36 rounded-full bg-[radial-gradient(circle_at_30%_30%,#ffffff_0%,#f7d9c7_45%,#eca57a_100%)] sm:left-10 sm:h-56 sm:w-56" />
               <div className="absolute bottom-10 left-24 h-28 w-28 rounded-full bg-[radial-gradient(circle_at_30%_30%,#f7f2e8_0%,#d9dfd0_45%,#adc49b_100%)] sm:bottom-14 sm:left-36 sm:h-48 sm:w-48" />
               <div className="absolute right-4 top-4 max-w-[210px] rounded-3xl bg-white/85 px-4 py-3 shadow-lg shadow-black/5 sm:right-10 sm:top-10 sm:max-w-[260px] sm:px-5 sm:py-4">
-                <p className="text-xs uppercase tracking-[0.25em] text-black/45">Plan-enabled features</p>
+                <p className="text-xs uppercase tracking-[0.25em] text-black/60">Plan-enabled features</p>
                 <p className="mt-3 text-2xl font-semibold text-ink sm:text-3xl">Analytics, finance, parent portal</p>
               </div>
               <div className="absolute bottom-10 right-8 space-y-3">
@@ -552,15 +447,15 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
 
             <div>
               <h3 className="font-display text-4xl leading-tight md:text-5xl">
-                Designed for platform owners and school admins working side by side.
+                Designed for the Acadex team and school admins working side by side.
               </h3>
-              <p className="mt-5 max-w-xl text-base leading-7 text-black/65">
-                Public signup is not the model here. Platform owners create school tenants, assign plans, and enable
-                features. Each school admin then builds out the rest of the school team from within their isolated dashboard.
+              <p className="mt-5 max-w-xl text-base leading-8 text-black/80">
+                Public signup is not the model here. The Acadex team sets up each school, assigns the right plan, and enables
+                features. Each school admin then builds out the rest of the school team from within the school dashboard.
               </p>
               <div className="mt-6 space-y-4">
                 {[
-                  "Tenant-aware school onboarding from the platform dashboard",
+                  "Controlled school setup from the platform dashboard",
                   "Role-based team creation for school admins",
                   "Analytics, attendance, exams, and finance in one operating layer"
                 ].map((item) => (
@@ -578,15 +473,15 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
                 </button>
                 <button
                   className="inline-flex items-center gap-3 rounded-full bg-white px-4 py-3 shadow-lg shadow-black/5"
-                  onClick={onLogin}
+                  onClick={onContactSales}
                   type="button"
                 >
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/5 text-ink">
                     <IconPhone />
                   </span>
                   <span className="text-left">
-                    <span className="block text-sm text-black/45">Contact sales</span>
-                    <span className="block text-sm font-semibold">Platform onboarding team</span>
+                    <span className="block text-sm text-black/60">Contact sales</span>
+                    <span className="block text-sm font-semibold">Acadex rollout team</span>
                   </span>
                 </button>
               </div>
@@ -595,25 +490,33 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
         </section>
 
         <section className="mx-auto max-w-[1440px] px-6 py-8 md:px-10" id="plans">
-          <div className="grid gap-5 lg:grid-cols-3">
+          <div className="mb-10 max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.35em] text-black/55">Pricing</p>
+            <h3 className="mt-3 font-display text-4xl md:text-5xl">Choose the plan that fits your school.</h3>
+            <p className="mt-4 text-base leading-8 text-black/78">
+              Acadex pricing is student-based across every tier. What changes from Starter to Growth to Enterprise is
+              the depth of features, visibility, and rollout support available to each school.
+            </p>
+          </div>
+          <div className="-mx-6 flex gap-5 overflow-x-auto px-6 pb-2 md:mx-0 md:grid md:grid-cols-2 md:px-0 lg:grid-cols-3">
             {planCards.map((plan) => (
-              <article key={plan.name} className={`rounded-[2rem] p-5 shadow-lg shadow-black/5 ${plan.tone}`}>
-                <div className="rounded-[1.6rem] bg-white p-5">
+              <article key={plan.name} className={`w-[min(88vw,22rem)] flex-none rounded-[2rem] p-5 shadow-lg shadow-black/5 md:w-auto md:flex-initial ${plan.tone}`}>
+                <div className="flex h-full min-h-[420px] flex-col rounded-[1.6rem] bg-white p-5">
                   <div className="flex items-center justify-between">
                     <p className="text-2xl font-semibold">{plan.name}</p>
                     <span className="rounded-full bg-black/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-black/55">Plan</span>
                   </div>
                   <p className="mt-4 font-display text-5xl">{plan.price}</p>
-                  <p className="mt-1 text-sm text-black/50">priced in Gambian dalasi by school size and billing basis</p>
-                  <div className="mt-6 space-y-3">
+                  <p className="mt-1 text-sm text-black/68">priced in Gambian dalasi per student, with features expanding by plan</p>
+                  <div className="mt-6 flex flex-1 flex-col gap-3">
                     {plan.features.map((feature) => (
-                      <div key={feature} className="rounded-2xl bg-sand/60 px-4 py-3 text-sm">
-                        {feature}
+                      <div key={feature} className="flex min-h-[68px] items-center rounded-2xl bg-sand/60 px-4 py-3 text-sm leading-6">
+                        <span>{feature}</span>
                       </div>
                     ))}
                   </div>
                   <button
-                    className="mt-6 w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-black/75 shadow-sm"
+                    className="mt-6 w-full rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-black/75 shadow-sm"
                     onClick={() => onStartPlan(plan.name.toLowerCase() as PlanSlug)}
                     type="button"
                   >
@@ -627,10 +530,10 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
 
         <section className="mx-auto max-w-[1440px] px-6 py-14 md:px-10" id="resources">
           <div className="mx-auto max-w-4xl text-center">
-            <p className="text-xs uppercase tracking-[0.35em] text-black/40">Testimonials</p>
+            <p className="text-xs uppercase tracking-[0.35em] text-black/55">Testimonials</p>
             <h3 className="mt-3 font-display text-4xl md:text-5xl">What do school teams say?</h3>
-            <p className="mt-4 text-base leading-7 text-black/60">
-              Real feedback from teams that want school operations, analytics, and tenant control to feel like one
+            <p className="mt-4 text-base leading-8 text-black/78">
+              Real feedback from teams that want school operations, analytics, and access control to feel like one
               product instead of several disconnected systems.
             </p>
           </div>
@@ -639,14 +542,14 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
             {testimonials.map((item) => (
               <article key={item.name} className="rounded-[2rem] bg-white p-6 shadow-lg shadow-black/5">
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-ember">{item.stars}</p>
-                <p className="mt-5 text-base leading-8 text-black/70">{item.quote}</p>
+                <p className="mt-5 text-base leading-8 text-black/82">{item.quote}</p>
                 <div className="mt-6 flex items-center gap-4">
                   <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
                     {item.name.split(" ").map((part) => part[0]).join("")}
                   </span>
                   <div>
                     <p className="font-semibold">{item.name}</p>
-                    <p className="text-sm text-black/50">{item.role}</p>
+                    <p className="text-sm text-black/65">{item.role}</p>
                   </div>
                 </div>
               </article>
@@ -654,56 +557,6 @@ export function LandingPage({ onLogin, onOpenDetail, onStartPlan }: LandingPageP
           </div>
         </section>
 
-        <footer className="bg-[linear-gradient(90deg,#eef0eb_0%,#f9ede3_100%)]" id="footer">
-          <div className="mx-auto grid max-w-[1440px] gap-8 px-6 py-8 md:px-10 lg:grid-cols-[1.1fr_0.9fr_0.9fr_0.9fr]">
-            <div>
-              <p className="text-xs uppercase tracking-[0.45em] text-ember/60">Acadex</p>
-              <h4 className="mt-3 font-display text-3xl">Built for modern school operators.</h4>
-              <p className="mt-4 max-w-sm text-sm leading-7 text-black/60">
-                Multi-tenant school management with subscription plans, feature flags, auditability, async workflows, and operational dashboards.
-              </p>
-              <form className="mt-6 flex max-w-sm overflow-hidden rounded-full bg-white shadow-lg shadow-black/5" onSubmit={handleEmailSubmit}>
-                <label className="sr-only" htmlFor="landing-email">
-                  Work email
-                </label>
-                <input
-                  className="flex-1 bg-transparent px-5 py-4 text-sm outline-none"
-                  id="landing-email"
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="Enter work email"
-                  value={email}
-                />
-                <button className="inline-flex min-w-[68px] items-center justify-center bg-ink px-5 text-white" type="submit">
-                  <IconMail />
-                </button>
-              </form>
-              {emailMessage ? <p className="mt-3 text-sm text-black/60">{emailMessage}</p> : null}
-            </div>
-
-            {footerGroups.map((group) => (
-              <div key={group.title}>
-                <h5 className="text-lg font-semibold">{group.title}</h5>
-                <div className="mt-4 space-y-3 text-sm text-black/60">
-                  {group.links.map((link) => (
-                    <button key={link} className="block text-left transition hover:text-black" onClick={() => scrollToId("hero")} type="button">
-                      {link}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mx-auto mt-8 flex max-w-[1440px] flex-wrap items-center justify-between gap-4 border-t border-black/10 px-6 pb-8 pt-6 text-sm text-black/50 md:px-10">
-            <p>Copyright 2026 Acadex. Multi-tenant school management SaaS.</p>
-            <div className="flex gap-3">
-              {["X", "IG", "FB", "IN"].map((item) => (
-                <SocialIcon key={item} label={item} />
-              ))}
-            </div>
-          </div>
-        </footer>
-      </div>
-    </div>
+    </PublicShell>
   );
 }

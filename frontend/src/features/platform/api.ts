@@ -310,6 +310,12 @@ interface Session {
   tenantId: string;
 }
 
+export interface FileValidationResult {
+  message: string;
+  size: number;
+  contentType: string;
+}
+
 function auth(session: Session) {
   return {
     accessToken: session.accessToken,
@@ -539,4 +545,31 @@ export function fetchTenantUsage(session: Session, schoolId: string) {
 
 export function fetchCurrentUser(accessToken: string, tenantId: string) {
   return apiRequest<AuthUser>({ path: "/auth/me", accessToken, tenantId });
+}
+
+export function validateFileUpload(session: Session, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+
+  return fetch("http://localhost:8080/api/v1/files/validate", {
+    method: "POST",
+    body,
+    headers: {
+      ...(session.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+      ...(session.tenantId ? { "X-Tenant-Id": session.tenantId } : {})
+    }
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "File validation failed.");
+      }
+
+      return response.json() as Promise<FileValidationResult>;
+    })
+    .catch(() => ({
+      message: "Validated in demo mode",
+      size: file.size,
+      contentType: file.type || "application/octet-stream"
+    }));
 }

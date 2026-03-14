@@ -37,7 +37,7 @@ export const detailPages: Record<DetailSlug, DetailContent> = {
     summary: "Each school operates inside its own tenant boundary so one institution never bleeds into another.",
     points: [
       "Tenant-aware access is enforced across users, operational modules, and analytics visibility.",
-      "Platform owners can manage many schools from one system without mixing tenant data.",
+      "You can manage many schools from one system without mixing school data.",
       "This model supports private schools, campus groups, and expanding education businesses."
     ],
     outcomes: ["Cleaner governance", "Safer multi-school operations", "Production-ready tenant boundaries"]
@@ -46,10 +46,10 @@ export const detailPages: Record<DetailSlug, DetailContent> = {
     slug: "central-provisioning",
     eyebrow: "Platform Operations",
     title: "Central provisioning",
-    summary: "Super admins create schools, assign subscription plans, and launch the first school admin from a single control layer.",
+    summary: "The Acadex platform team sets up schools, assigns plans, and launches the first school admin from one control layer.",
     points: [
-      "New tenants are created intentionally, not through public sign-up.",
-      "Plan selection, feature enablement, and tenant activation happen at onboarding time.",
+      "New schools are set up intentionally, not through public sign-up.",
+      "Plan selection, feature enablement, and school activation happen during rollout.",
       "School admins can then continue setup inside their own dashboard."
     ],
     outcomes: ["Cleaner school onboarding", "Better governance", "More predictable expansion"]
@@ -60,7 +60,7 @@ export const detailPages: Record<DetailSlug, DetailContent> = {
     title: "Finance and analytics",
     summary: "Acadex turns fees, collections, attendance, and academic performance into one operating picture.",
     points: [
-      "Track invoicing, payments, and outstanding balances by school tenant.",
+      "Track invoicing, payments, and outstanding balances by school.",
       "Expose dashboards that help admins see activity without stitching together reports manually.",
       "Move from isolated records to leadership-level visibility."
     ],
@@ -94,11 +94,11 @@ export const detailPages: Record<DetailSlug, DetailContent> = {
     slug: "role-based-team-setup",
     eyebrow: "School Users",
     title: "Role-based team setup",
-    summary: "School admins can add teachers, students, parents, and other school-level users inside their own tenant.",
+    summary: "School admins can add teachers, students, parents, and other school-level users inside their own workspace.",
     points: [
-      "The school team grows from inside the tenant dashboard instead of through public registration.",
+      "The school team grows from inside the school dashboard instead of through public registration.",
       "Roles align access with responsibility.",
-      "This keeps onboarding secure and easier to govern."
+      "This keeps school setup secure and easier to govern."
     ],
     outcomes: ["Controlled user creation", "Cleaner permissions", "Safer school onboarding"]
   },
@@ -145,8 +145,8 @@ export const planPages: Record<PlanSlug, PlanContent> = {
   growth: {
     slug: "growth",
     name: "Growth",
-    price: "D150 per personnel",
-    billingBasis: "Billed in Gambian dalasi by school personnel count",
+    price: "D150 per student",
+    billingBasis: "Billed in Gambian dalasi by active student count",
     summary: "A broader operating plan for schools that need finance, dashboards, and stronger admin control.",
     included: [
       "Teacher and staff management",
@@ -158,14 +158,14 @@ export const planPages: Record<PlanSlug, PlanContent> = {
   enterprise: {
     slug: "enterprise",
     name: "Enterprise",
-    price: "Custom blended pricing",
-    billingBasis: "Priced in Gambian dalasi by student count, personnel count, or both",
-    summary: "A tailored rollout for larger institutions, multi-school operators, or complex implementation needs.",
+    price: "Custom per student pricing",
+    billingBasis: "Billed in Gambian dalasi by active student count with enterprise feature rollout",
+    summary: "A tailored rollout for larger institutions, school groups, or complex implementation needs.",
     included: [
       "Multi-school rollout and central oversight",
       "Custom feature enablement and analytics",
       "Priority onboarding and implementation support"
     ],
-    recommendedFor: "Campus groups, education networks, and platform-scale operators"
+    recommendedFor: "Campus groups, education networks, and larger school operators"
   }
 };

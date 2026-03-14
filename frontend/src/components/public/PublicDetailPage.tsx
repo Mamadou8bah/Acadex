@@ -1,17 +1,30 @@
 import { detailPages, type DetailSlug } from "./publicContent";
+import { PublicShell } from "./PublicShell";
 
 interface PublicDetailPageProps {
   slug: DetailSlug;
   onBack: () => void;
+  onContactSales: () => void;
+  onLogin: () => void;
   onStartPlan: () => void;
 }
 
-export function PublicDetailPage({ slug, onBack, onStartPlan }: PublicDetailPageProps) {
+export function PublicDetailPage({ slug, onBack, onContactSales, onLogin, onStartPlan }: PublicDetailPageProps) {
   const page = detailPages[slug];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(194,65,12,0.18),transparent_26%),linear-gradient(180deg,#f7efe3_0%,#f2e3ca_100%)] px-4 py-6 md:px-6">
-      <div className="mx-auto max-w-6xl rounded-[2.4rem] bg-white/80 p-6 shadow-2xl shadow-black/10 backdrop-blur md:p-10">
+    <PublicShell
+      navItems={[
+        { label: "Back to landing", onClick: onBack },
+        { label: "Request rollout", onClick: onStartPlan },
+        { label: "Sign in", onClick: onLogin }
+      ]}
+      onContactSales={onContactSales}
+      onHome={onBack}
+      onLogin={onLogin}
+    >
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+      <div className="rounded-[2.4rem] bg-white/80 p-6 shadow-2xl shadow-black/10 backdrop-blur md:p-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-ember/70">{page.eyebrow}</p>
@@ -46,15 +59,16 @@ export function PublicDetailPage({ slug, onBack, onStartPlan }: PublicDetailPage
 
             <div className="mt-10 rounded-[1.6rem] bg-white/8 p-5">
               <p className="text-sm text-sand/75">
-                Want this in your rollout? Start onboarding and capture the school, plan, and contact details in stages.
+                Want this for your school? Request a rollout and share your school, plan, and contact details in stages.
               </p>
               <button className="mt-5 rounded-full bg-white px-5 py-3 text-sm font-semibold text-ink" onClick={onStartPlan} type="button">
-                Start onboarding
+                Request rollout
               </button>
             </div>
           </section>
         </div>
       </div>
-    </div>
+      </div>
+    </PublicShell>
   );
 }

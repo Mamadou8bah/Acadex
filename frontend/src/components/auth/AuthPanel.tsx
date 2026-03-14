@@ -1,16 +1,22 @@
 import { FormEvent, useState } from "react";
-import {
-  forgotPassword,
-  login,
-  resetPassword,
-  verifyEmail
-} from "../../features/auth/api";
+import { forgotPassword, login } from "../../features/auth/api";
 import { useAuthStore } from "../../store/auth";
 
-type Mode = "login" | "verify" | "forgot" | "reset";
+type Mode = "login" | "forgot";
 
 interface AuthPanelProps {
   onBack?: () => void;
+}
+
+function Field(props: { name: string; placeholder: string; type?: string }) {
+  return (
+    <input
+      className="w-full rounded-[1.4rem] border border-black/10 bg-white px-4 py-4 text-sm text-ink outline-none transition placeholder:text-black/35 focus:border-ember/40 focus:ring-4 focus:ring-ember/10"
+      name={props.name}
+      placeholder={props.placeholder}
+      type={props.type ?? "text"}
+    />
+  );
 }
 
 export function AuthPanel({ onBack }: AuthPanelProps) {
@@ -36,23 +42,6 @@ export function AuthPanel({ onBack }: AuthPanelProps) {
     }
   }
 
-  async function onVerify(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    const form = new FormData(event.currentTarget);
-    try {
-      const response = await verifyEmail(String(form.get("token")));
-      setMessage(response.message);
-      setMode("login");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to verify email.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function onForgot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -62,7 +51,6 @@ export function AuthPanel({ onBack }: AuthPanelProps) {
     try {
       const response = await forgotPassword(String(form.get("email")));
       setMessage(response.message);
-      setMode("reset");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to send reset message.");
     } finally {
@@ -70,31 +58,18 @@ export function AuthPanel({ onBack }: AuthPanelProps) {
     }
   }
 
-  async function onReset(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    const form = new FormData(event.currentTarget);
-    try {
-      const response = await resetPassword(String(form.get("token")), String(form.get("newPassword")));
-      setMessage(response.message);
-      setMode("login");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to reset password.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <section className="w-full max-w-md rounded-[2rem] border border-black/10 bg-white/88 p-6 shadow-2xl shadow-black/10 backdrop-blur md:p-8">
-      <div className="flex items-center justify-between gap-4">
+    <section className="w-full max-w-[480px] rounded-[2.1rem] border border-black/10 bg-white/88 p-6 shadow-2xl shadow-black/10 backdrop-blur md:p-8">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-black/45">Secure Access</p>
-          <h2 className="mt-2 font-display text-4xl text-ink">Sign in</h2>
-          <p className="mt-2 text-sm text-black/60">
-            School onboarding happens inside the admin dashboard. Public access is sign-in only.
+          <p className="text-xs uppercase tracking-[0.35em] text-ember/65">Secure Access</p>
+          <h2 className="mt-3 font-display text-4xl text-ink md:text-5xl">
+            {mode === "login" ? "Sign in" : "Forgot password"}
+          </h2>
+          <p className="mt-3 max-w-sm text-sm leading-7 text-black/60">
+            {mode === "login"
+              ? "Use your school or platform account to enter the dashboard."
+              : "Enter your email and we will send password reset instructions."}
           </p>
         </div>
         {onBack ? (
@@ -108,61 +83,63 @@ export function AuthPanel({ onBack }: AuthPanelProps) {
         ) : null}
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2 text-xs uppercase tracking-[0.2em] text-black/45">
-        {(["login", "forgot", "reset", "verify"] as Mode[]).map((item) => (
-          <button
-            key={item}
-            className={`rounded-full px-4 py-2 ${mode === item ? "bg-ember text-white" : "bg-black/5 text-black/60"}`}
-            onClick={() => setMode(item)}
-            type="button"
-          >
-            {item}
-          </button>
-        ))}
+      <div className="mt-6 inline-flex rounded-full bg-black/5 p-1.5">
+        <button
+          className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] ${mode === "login" ? "bg-ink text-white" : "text-black/55"}`}
+          onClick={() => {
+            setMode("login");
+            setMessage(null);
+            setError(null);
+          }}
+          type="button"
+        >
+          Login
+        </button>
+        <button
+          className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] ${mode === "forgot" ? "bg-ink text-white" : "text-black/55"}`}
+          onClick={() => {
+            setMode("forgot");
+            setMessage(null);
+            setError(null);
+          }}
+          type="button"
+        >
+          Forgot Password
+        </button>
       </div>
 
-      <div className="mt-6">
-        {mode === "login" && (
+      <div className="mt-8">
+        {mode === "login" ? (
           <form className="space-y-4" onSubmit={onLogin}>
-            <input className="w-full rounded-2xl border border-black/10 p-4" name="email" placeholder="Email" />
-            <input className="w-full rounded-2xl border border-black/10 p-4" name="password" placeholder="Password" type="password" />
-            <button className="w-full rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" disabled={busy} type="submit">
+            <Field name="email" placeholder="Email" />
+            <Field name="password" placeholder="Password" type="password" />
+            <button className="w-full rounded-full bg-ink px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-black/10" disabled={busy} type="submit">
               {busy ? "Signing in..." : "Sign in to dashboard"}
             </button>
+            <button
+              className="text-sm font-semibold text-ember"
+              onClick={() => {
+                setMode("forgot");
+                setMessage(null);
+                setError(null);
+              }}
+              type="button"
+            >
+              Forgot your password?
+            </button>
           </form>
-        )}
-
-        {mode === "forgot" && (
+        ) : (
           <form className="space-y-4" onSubmit={onForgot}>
-            <input className="w-full rounded-2xl border border-black/10 p-4" name="email" placeholder="Email" />
-            <button className="w-full rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" disabled={busy} type="submit">
-              {busy ? "Sending..." : "Send reset token"}
-            </button>
-          </form>
-        )}
-
-        {mode === "reset" && (
-          <form className="space-y-4" onSubmit={onReset}>
-            <input className="w-full rounded-2xl border border-black/10 p-4" name="token" placeholder="Reset token" />
-            <input className="w-full rounded-2xl border border-black/10 p-4" name="newPassword" placeholder="New password" type="password" />
-            <button className="w-full rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" disabled={busy} type="submit">
-              {busy ? "Updating..." : "Reset password"}
-            </button>
-          </form>
-        )}
-
-        {mode === "verify" && (
-          <form className="space-y-4" onSubmit={onVerify}>
-            <input className="w-full rounded-2xl border border-black/10 p-4" name="token" placeholder="Verification token" />
-            <button className="w-full rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" disabled={busy} type="submit">
-              {busy ? "Verifying..." : "Verify email"}
+            <Field name="email" placeholder="Email" />
+            <button className="w-full rounded-full bg-ink px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-black/10" disabled={busy} type="submit">
+              {busy ? "Sending..." : "Send reset instructions"}
             </button>
           </form>
         )}
       </div>
 
-      {message && <p className="mt-4 rounded-2xl bg-moss/10 p-4 text-sm text-moss">{message}</p>}
-      {error && <p className="mt-4 rounded-2xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+      {message ? <p className="mt-5 rounded-2xl bg-moss/10 p-4 text-sm text-moss">{message}</p> : null}
+      {error ? <p className="mt-5 rounded-2xl bg-red-50 p-4 text-sm text-red-700">{error}</p> : null}
     </section>
   );
 }

@@ -1,15 +1,17 @@
 import { FormEvent, useState } from "react";
 import { planPages, type PlanSlug } from "./publicContent";
+import { PublicShell } from "./PublicShell";
 
 interface PlanOnboardingPageProps {
   plan: PlanSlug;
   onBack: () => void;
+  onContactSales: () => void;
   onComplete: () => void;
 }
 
 type Step = 0 | 1 | 2;
 
-export function PlanOnboardingPage({ plan, onBack, onComplete }: PlanOnboardingPageProps) {
+export function PlanOnboardingPage({ plan, onBack, onContactSales, onComplete }: PlanOnboardingPageProps) {
   const page = planPages[plan];
   const [step, setStep] = useState<Step>(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -27,15 +29,26 @@ export function PlanOnboardingPage({ plan, onBack, onComplete }: PlanOnboardingP
 
   function finishOnboarding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("Onboarding details captured. Continue to secure sign-in to complete your rollout.");
+    setMessage("Your rollout request has been captured. The Acadex team can review your details and follow up on setup.");
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(194,65,12,0.18),transparent_26%),linear-gradient(180deg,#f7efe3_0%,#f2e3ca_100%)] px-4 py-6 md:px-6">
-      <div className="mx-auto max-w-6xl rounded-[2.4rem] bg-white/84 p-6 shadow-2xl shadow-black/10 backdrop-blur md:p-10">
+    <PublicShell
+      footerMessage={message}
+      navItems={[
+        { label: "Back", onClick: onBack },
+        { label: "Selected plan", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+        { label: "Sign in", onClick: onComplete }
+      ]}
+      onContactSales={onContactSales}
+      onHome={onBack}
+      onLogin={onComplete}
+    >
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+      <div className="rounded-[2.4rem] bg-white/84 p-6 shadow-2xl shadow-black/10 backdrop-blur md:p-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-ember/70">Plan onboarding</p>
+            <p className="text-xs uppercase tracking-[0.35em] text-ember/70">School rollout request</p>
             <h1 className="mt-3 font-display text-4xl text-ink md:text-6xl">{page.name}</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-black/65">{page.summary}</p>
           </div>
@@ -87,11 +100,6 @@ export function PlanOnboardingPage({ plan, onBack, onComplete }: PlanOnboardingP
                 <input className="w-full rounded-2xl border border-black/10 p-4" name="schoolCount" placeholder="How many schools or campuses?" required />
                 <input className="w-full rounded-2xl border border-black/10 p-4" name="studentSize" placeholder="Estimated student population" required />
                 <input className="w-full rounded-2xl border border-black/10 p-4" name="personnelSize" placeholder="Estimated school personnel count" required />
-                <select className="w-full rounded-2xl border border-black/10 p-4" defaultValue="student" name="billingBasis">
-                  <option value="student">Price by student count</option>
-                  <option value="personnel">Price by personnel count</option>
-                  <option value="mixed">Use a blended pricing model</option>
-                </select>
                 <textarea className="w-full rounded-2xl border border-black/10 p-4" name="needs" placeholder="Which modules do you need first?" rows={5} required />
                 <div className="flex justify-between gap-3">
                   <button className="rounded-full border border-black/10 px-6 py-3 text-sm font-semibold text-black/65" onClick={previousStep} type="button">
@@ -117,12 +125,12 @@ export function PlanOnboardingPage({ plan, onBack, onComplete }: PlanOnboardingP
                     Back
                   </button>
                   <button className="rounded-full bg-ember px-6 py-3 text-sm font-semibold text-white" type="submit">
-                    Save onboarding details
+                    Send rollout request
                   </button>
                 </div>
                 {message ? (
                   <button className="rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white" onClick={onComplete} type="button">
-                    Continue to sign in
+                    Go to sign in
                   </button>
                 ) : null}
               </form>
@@ -130,6 +138,7 @@ export function PlanOnboardingPage({ plan, onBack, onComplete }: PlanOnboardingP
           </section>
         </div>
       </div>
-    </div>
+      </div>
+    </PublicShell>
   );
 }

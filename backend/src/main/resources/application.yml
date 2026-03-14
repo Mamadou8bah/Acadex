@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: acadex-backend
+  cache:
+    type: redis
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/acadex}
+    username: ${DATABASE_USERNAME:acadex}
+    password: ${DATABASE_PASSWORD:acadex}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          max-interval: 5000
+          multiplier: 2
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:VGhpc0lzTm90QVNlY3JldEJ1dFN1ZmZpY2llbnRGb3JEZXZlbG9wbWVudDEyMzQ1Njc4OTA=}
+    access-token-minutes: ${JWT_ACCESS_MINUTES:30}
+    refresh-token-days: ${JWT_REFRESH_DAYS:14}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from-email: ${RESEND_FROM_EMAIL:onboarding@acadex.dev}
+
+app:
+  queues:
+    notifications: acadex.notifications

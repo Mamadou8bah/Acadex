@@ -90,6 +90,12 @@ public class AcademicService {
     @Transactional
     public TermResponse createTerm(CreateTermRequest request, UUID actorId) {
         UUID tenantId = tenantAccessService.requireTenant();
+        academicYearRepository.findById(request.academicYearId())
+                .filter(item -> tenantId.equals(item.getTenantId()))
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Academic year not found."));
+        if (termRepository.findAllByTenantIdAndAcademicYearId(tenantId, request.academicYearId()).size() >= 3) {
+            throw new ResponseStatusException(BAD_REQUEST, "Each academic year can only have three terms.");
+        }
         Term entity = new Term();
         entity.setTenantId(tenantId);
         entity.setAcademicYearId(request.academicYearId());
@@ -133,22 +139,25 @@ public class AcademicService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Subject not found."));
         SchoolClass schoolClass = schoolClassRepository.findByIdAndTenantId(request.classId(), tenantId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Class not found."));
+        Term term = termRepository.findByIdAndTenantId(request.termId(), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Term not found."));
         UserAccount teacher = userAccountRepository.findByIdAndTenantId(request.teacherId(), tenantId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Teacher not found."));
         if (teacher.getRole() != PlatformRole.TEACHER) {
             throw new ResponseStatusException(BAD_REQUEST, "Only teachers can receive subject assignments.");
         }
-        if (subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectId(tenantId, request.classId(), request.subjectId())) {
-            throw new ResponseStatusException(BAD_REQUEST, "This class already has a teacher assigned for the subject.");
+        if (subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectIdAndTermId(tenantId, request.classId(), request.subjectId(), request.termId())) {
+            throw new ResponseStatusException(BAD_REQUEST, "This class already has a teacher assigned for the subject in the selected term.");
         }
         SubjectAssignment entity = new SubjectAssignment();
         entity.setTenantId(tenantId);
         entity.setSubjectId(request.subjectId());
         entity.setTeacherId(request.teacherId());
         entity.setClassId(request.classId());
+        entity.setTermId(request.termId());
         subjectAssignmentRepository.save(entity);
         auditService.log(tenantId, actorId, "SUBJECT_ASSIGNED", "SubjectAssignment", entity.getId().toString(), entity.getSubjectId().toString());
-        return new SubjectAssignmentResponse(entity.getId(), subject.getId(), teacher.getId(), schoolClass.getId());
+        return new SubjectAssignmentResponse(entity.getId(), subject.getId(), teacher.getId(), schoolClass.getId(), term.getId());
     }
 
     @Transactional
@@ -208,7 +217,7 @@ public class AcademicService {
     public List<SubjectAssignmentResponse> listSubjectAssignments() {
         UUID tenantId = tenantAccessService.requireTenant();
         return subjectAssignmentRepository.findAllByTenantId(tenantId).stream()
-                .map(entity -> new SubjectAssignmentResponse(entity.getId(), entity.getSubjectId(), entity.getTeacherId(), entity.getClassId()))
+                .map(entity -> new SubjectAssignmentResponse(entity.getId(), entity.getSubjectId(), entity.getTeacherId(), entity.getClassId(), entity.getTermId()))
                 .toList();
     }
 
@@ -217,15 +226,17 @@ public class AcademicService {
         UUID tenantId = tenantAccessService.requireTenant();
         List<SchoolClass> classes = schoolClassRepository.findAllByTenantId(tenantId);
         List<Subject> subjects = subjectRepository.findAllByTenantId(tenantId);
+        List<Term> terms = termRepository.findAllByTenantId(tenantId);
         return subjectAssignmentRepository.findAllByTenantIdAndTeacherId(tenantId, teacherId).stream()
-                .map(assignment -> toTeacherAssignmentResponse(assignment, classes, subjects))
+                .map(assignment -> toTeacherAssignmentResponse(assignment, classes, subjects, terms))
                 .toList();
     }
 
     private TeacherAssignmentResponse toTeacherAssignmentResponse(
             SubjectAssignment assignment,
             List<SchoolClass> classes,
-            List<Subject> subjects
+            List<Subject> subjects,
+            List<Term> terms
     ) {
         SchoolClass schoolClass = classes.stream()
                 .filter(item -> item.getId().equals(assignment.getClassId()))
@@ -235,6 +246,10 @@ public class AcademicService {
                 .filter(item -> item.getId().equals(assignment.getSubjectId()))
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Assigned subject no longer exists."));
+        Term term = terms.stream()
+                .filter(item -> item.getId().equals(assignment.getTermId()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Assigned term no longer exists."));
         boolean isClassTeacher = assignment.getTeacherId().equals(schoolClass.getClassTeacherId());
         return new TeacherAssignmentResponse(
                 assignment.getId(),
@@ -243,6 +258,8 @@ public class AcademicService {
                 schoolClass.getName(),
                 schoolClass.getLevelName(),
                 isClassTeacher,
+                term.getId(),
+                term.getName(),
                 subject.getId(),
                 subject.getName(),
                 subject.getCode()

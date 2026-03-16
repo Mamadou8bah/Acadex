@@ -10,6 +10,6 @@ public final class AcademicRequests {
     public record CreateTermRequest(UUID academicYearId, String name, LocalDate startDate, LocalDate endDate) {}
     public record CreateClassRequest(String name, String levelName, UUID classTeacherId) {}
     public record CreateSubjectRequest(String name, String code) {}
-    public record AssignSubjectRequest(UUID subjectId, UUID teacherId, UUID classId) {}
+    public record AssignSubjectRequest(UUID subjectId, UUID teacherId, UUID classId, UUID termId) {}
     public record EnrollStudentRequest(UUID studentId, UUID classId, UUID academicYearId) {}
 }

@@ -80,7 +80,7 @@ public class ExamService {
     @Transactional
     public ExamResponse createExam(CreateExamRequest request, UUID actorId, PlatformRole actorRole) {
         UUID tenantId = tenantAccessService.requireTenant();
-        ensureTeacherCanManageSubject(actorRole, tenantId, actorId, request.classId(), request.subjectId());
+        ensureTeacherCanManageSubject(actorRole, tenantId, actorId, request.classId(), request.subjectId(), request.termId());
         Exam exam = new Exam();
         exam.setTenantId(tenantId);
         exam.setName(request.name());
@@ -116,7 +116,7 @@ public class ExamService {
         UUID tenantId = tenantAccessService.requireTenant();
         Exam exam = examRepository.findByIdAndTenantId(request.examId(), tenantId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Exam not found."));
-        ensureTeacherCanManageSubject(actorRole, tenantId, actorId, exam.getClassId(), exam.getSubjectId());
+        ensureTeacherCanManageSubject(actorRole, tenantId, actorId, exam.getClassId(), exam.getSubjectId(), exam.getTermId());
         if (request.score() < 0) {
             throw new ResponseStatusException(BAD_REQUEST, "Score cannot be negative.");
         }
@@ -143,6 +143,7 @@ public class ExamService {
                                 tenantId,
                                 exam.getClassId(),
                                 exam.getSubjectId(),
+                                exam.getTermId(),
                                 actorId
                         ))
                 .map(exam -> new ExamResponse(exam.getId(), exam.getName(), exam.getSubjectId(), exam.getClassId(), exam.getTermId(), exam.getMaxScore()))
@@ -225,15 +226,17 @@ public class ExamService {
             UUID tenantId,
             UUID actorId,
             UUID classId,
-            UUID subjectId
+            UUID subjectId,
+            UUID termId
     ) {
         if (actorRole != PlatformRole.TEACHER) {
             return;
         }
-        boolean assigned = subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectIdAndTeacherId(
+        boolean assigned = subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectIdAndTermIdAndTeacherId(
                 tenantId,
                 classId,
                 subjectId,
+                termId,
                 actorId
         );
         if (!assigned) {

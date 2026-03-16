@@ -8,6 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface SubjectAssignmentRepository extends JpaRepository<SubjectAssignment, UUID> {
     List<SubjectAssignment> findAllByTenantId(UUID tenantId);
     List<SubjectAssignment> findAllByTenantIdAndTeacherId(UUID tenantId, UUID teacherId);
-    boolean existsByTenantIdAndClassIdAndSubjectId(UUID tenantId, UUID classId, UUID subjectId);
-    boolean existsByTenantIdAndClassIdAndSubjectIdAndTeacherId(UUID tenantId, UUID classId, UUID subjectId, UUID teacherId);
+    boolean existsByTenantIdAndClassIdAndSubjectIdAndTermId(UUID tenantId, UUID classId, UUID subjectId, UUID termId);
+    boolean existsByTenantIdAndClassIdAndSubjectIdAndTermIdAndTeacherId(UUID tenantId, UUID classId, UUID subjectId, UUID termId, UUID teacherId);
 }

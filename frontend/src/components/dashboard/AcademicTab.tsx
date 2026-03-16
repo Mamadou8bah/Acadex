@@ -108,7 +108,7 @@ export function AcademicTab({
   }, [enrollments, selectedScoreClassId, studentUsers]);
 
   const teacherAssignmentItems = teacherAssignments.map((assignment) =>
-    `${assignment.className} (${assignment.levelName}) • ${assignment.subjectName} ${assignment.classTeacher ? "• class teacher" : ""}`.replace(/\s+•\s+$/, "")
+    `${assignment.termName} • ${assignment.className} (${assignment.levelName}) • ${assignment.subjectName} ${assignment.classTeacher ? "• class teacher" : ""}`.replace(/\s+•\s+$/, "")
   );
 
   const adminAssignmentItems = subjectAssignments.map((assignment) => {
@@ -116,6 +116,7 @@ export function AcademicTab({
     const schoolClass = classes.find((item) => item.id === assignment.classId);
     const teacher = teacherUsers.find((item) => item.id === assignment.teacherId);
     return [
+      terms.find((item) => item.id === assignment.termId)?.name ?? "Unknown term",
       schoolClass?.name ?? "Unknown class",
       subject?.name ?? "Unknown subject",
       teacher ? `${teacher.firstName} ${teacher.lastName}` : "Unknown teacher"
@@ -246,7 +247,7 @@ export function AcademicTab({
         </Panel>
 
         <Panel subtitle="Terms and subjects" title="Curriculum structure">
-          <Items values={[`Terms configured: ${terms.length}`, `Subjects configured: ${subjects.length}`]} />
+          <Items values={[`Terms configured: ${terms.length}/3`, `Subjects configured: ${subjects.length}`]} />
           <form
             className="space-y-3"
             onSubmit={(event) =>
@@ -317,7 +318,8 @@ export function AcademicTab({
                   assignSubject(session, {
                     subjectId: String(fd.get("subjectId")),
                     teacherId: String(fd.get("teacherId")),
-                    classId: String(fd.get("classId"))
+                    classId: String(fd.get("classId")),
+                    termId: String(fd.get("termId"))
                   }),
                 ["dashboard", "subject-assignments"],
                 "Subject assigned."
@@ -345,6 +347,14 @@ export function AcademicTab({
               {classes.map((schoolClass) => (
                 <option key={schoolClass.id} value={schoolClass.id}>
                   {schoolClass.name} ({schoolClass.levelName})
+                </option>
+              ))}
+            </select>
+            <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="termId">
+              <option value="">Select term</option>
+              {terms.map((term) => (
+                <option key={term.id} value={term.id}>
+                  {term.name}
                 </option>
               ))}
             </select>
@@ -478,7 +488,7 @@ export function AcademicTab({
                       name: String(fd.get("name")),
                       subjectId: assignment.subjectId,
                       classId: assignment.classId,
-                      termId: String(fd.get("termId")),
+                      termId: assignment.termId,
                       maxScore: Number(fd.get("maxScore")),
                       examDate: String(fd.get("examDate"))
                     });
@@ -497,24 +507,16 @@ export function AcademicTab({
                 <option value="">Select class and subject</option>
                 {teacherAssignments.map((assignment) => (
                   <option key={assignment.assignmentId} value={assignment.assignmentId}>
-                    {assignment.className} - {assignment.subjectName}
+                    {assignment.termName} - {assignment.className} - {assignment.subjectName}
                   </option>
                 ))}
               </select>
               <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Exam name" />
-              <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="termId">
-                <option value="">Select term</option>
-                {terms.map((term) => (
-                  <option key={term.id} value={term.id}>
-                    {term.name}
-                  </option>
-                ))}
-              </select>
               <input className="w-full rounded-2xl border border-black/10 p-3" name="maxScore" placeholder="Max score" type="number" />
               <input className="w-full rounded-2xl border border-black/10 p-3" name="examDate" type="date" />
               {selectedTeachingAssignment ? (
                 <p className="text-sm text-black/55">
-                  Creating for {selectedTeachingAssignment.className} • {selectedTeachingAssignment.subjectName}
+                  Creating for {selectedTeachingAssignment.termName} • {selectedTeachingAssignment.className} • {selectedTeachingAssignment.subjectName}
                 </p>
               ) : null}
               <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create exam</button>

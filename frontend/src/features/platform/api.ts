@@ -100,7 +100,7 @@ const fallbackSubjects: Subject[] = [
 ];
 
 const fallbackSubjectAssignments: SubjectAssignment[] = [
-  { id: "assign-1", subjectId: mockSubjectId, teacherId: mockTeacherId, classId: mockClassId }
+  { id: "assign-1", subjectId: mockSubjectId, teacherId: mockTeacherId, classId: mockClassId, termId: mockTermId }
 ];
 
 const fallbackTeacherAssignments: TeacherAssignment[] = [
@@ -111,6 +111,8 @@ const fallbackTeacherAssignments: TeacherAssignment[] = [
     className: "Grade 10A",
     levelName: "Senior Secondary 1",
     classTeacher: true,
+    termId: mockTermId,
+    termName: "Second Term",
     subjectId: mockSubjectId,
     subjectName: "Mathematics",
     subjectCode: "MTH101"
@@ -273,6 +275,7 @@ export interface SubjectAssignment {
   subjectId: string;
   teacherId: string;
   classId: string;
+  termId: string;
 }
 
 export interface TeacherAssignment {
@@ -282,6 +285,8 @@ export interface TeacherAssignment {
   className: string;
   levelName: string;
   classTeacher: boolean;
+  termId: string;
+  termName: string;
   subjectId: string;
   subjectName: string;
   subjectCode: string;
@@ -474,7 +479,7 @@ export function createSubject(session: Session, payload: { name: string; code: s
   return apiRequest<Subject>({ path: "/academic/subjects", method: "POST", body: JSON.stringify(payload), ...auth(session) });
 }
 
-export function assignSubject(session: Session, payload: { subjectId: string; teacherId: string; classId: string }) {
+export function assignSubject(session: Session, payload: { subjectId: string; teacherId: string; classId: string; termId: string }) {
   return apiRequest<SubjectAssignment>({
     path: "/academic/subject-assignments",
     method: "POST",

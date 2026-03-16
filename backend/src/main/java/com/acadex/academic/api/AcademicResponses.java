@@ -11,7 +11,7 @@ public final class AcademicResponses {
     public record TermResponse(UUID id, UUID academicYearId, String name, LocalDate startDate, LocalDate endDate) {}
     public record SchoolClassResponse(UUID id, String name, String levelName, UUID classTeacherId) {}
     public record SubjectResponse(UUID id, String name, String code) {}
-    public record SubjectAssignmentResponse(UUID id, UUID subjectId, UUID teacherId, UUID classId) {}
+    public record SubjectAssignmentResponse(UUID id, UUID subjectId, UUID teacherId, UUID classId, UUID termId) {}
     public record TeacherAssignmentResponse(
             UUID assignmentId,
             UUID teacherId,
@@ -19,6 +19,8 @@ public final class AcademicResponses {
             String className,
             String levelName,
             boolean classTeacher,
+            UUID termId,
+            String termName,
             UUID subjectId,
             String subjectName,
             String subjectCode

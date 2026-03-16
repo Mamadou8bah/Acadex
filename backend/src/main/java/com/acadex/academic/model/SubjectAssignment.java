@@ -19,10 +19,15 @@ public class SubjectAssignment extends TenantScopedEntity {
     @Column(nullable = false)
     private UUID classId;
 
+    @Column(nullable = false)
+    private UUID termId;
+
     public UUID getSubjectId() { return subjectId; }
     public void setSubjectId(UUID subjectId) { this.subjectId = subjectId; }
     public UUID getTeacherId() { return teacherId; }
     public void setTeacherId(UUID teacherId) { this.teacherId = teacherId; }
     public UUID getClassId() { return classId; }
     public void setClassId(UUID classId) { this.classId = classId; }
+    public UUID getTermId() { return termId; }
+    public void setTermId(UUID termId) { this.termId = termId; }
 }

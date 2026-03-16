@@ -399,6 +399,7 @@ export function DashboardApp() {
   const [attendanceDraft, setAttendanceDraft] = useState<Record<string, "PRESENT" | "ABSENT">>({});
   const [studentSearch, setStudentSearch] = useState("");
   const [studentSort, setStudentSort] = useState<"name-asc" | "name-desc" | "class-asc">("name-asc");
+  const [studentClassFilter, setStudentClassFilter] = useState("ALL");
   const [teacherSearch, setTeacherSearch] = useState("");
   const [teacherSort, setTeacherSort] = useState<"name-asc" | "name-desc" | "classes-desc">("name-asc");
 
@@ -502,22 +503,6 @@ export function DashboardApp() {
     queryFn: () => fetchPaymentHistory(session, defaultStudentId)
   });
 
-  const activityChart = [
-    { label: "Classes", value: dashboard.data?.classesCount ?? 0, color: "#d97706" },
-    { label: "Exams", value: dashboard.data?.examsCount ?? 0, color: "#0f766e" },
-    { label: "Teachers", value: dashboard.data?.teacherAssignments ?? 0, color: "#1d4ed8" },
-    { label: "Years", value: years.data?.length ?? 0, color: "#7c3aed" }
-  ];
-  const attendanceTotal = (dashboard.data?.presentAttendanceRecords ?? 0) + (dashboard.data?.absentAttendanceRecords ?? 0);
-  const attendanceChart = [
-    { label: "Present", value: dashboard.data?.presentAttendanceRecords ?? 0, color: "#15803d" },
-    { label: "Absent", value: dashboard.data?.absentAttendanceRecords ?? 0, color: "#dc2626" }
-  ];
-  const financeChart = [
-    { label: "Invoiced", value: finance.data?.totalInvoiced ?? dashboard.data?.totalInvoiced ?? 0, color: "#b45309", format: formatCurrency },
-    { label: "Collected", value: finance.data?.totalCollected ?? dashboard.data?.totalCollected ?? 0, color: "#2563eb", format: formatCurrency },
-    { label: "Outstanding", value: finance.data?.outstandingBalance ?? Math.max((dashboard.data?.totalInvoiced ?? 0) - (dashboard.data?.totalCollected ?? 0), 0), color: "#111827", format: formatCurrency }
-  ];
   const studentSummaries: StudentSummary[] = studentUsers.map((student) => {
     const enrollment = studentEnrollmentById.get(student.id);
     const assignedClass = enrollment ? classById.get(enrollment.classId) : null;
@@ -549,6 +534,8 @@ export function DashboardApp() {
   const filteredStudentSummaries = studentSummaries
     .filter((student) => {
       const query = studentSearch.trim().toLowerCase();
+      const classMatches = studentClassFilter === "ALL" || student.className === studentClassFilter;
+      if (!classMatches) return false;
       if (!query) return true;
       return [student.name, student.email, student.className, student.enrollmentStatus].some((value) => value.toLowerCase().includes(query));
     })
@@ -557,6 +544,7 @@ export function DashboardApp() {
       if (studentSort === "class-asc") return left.className.localeCompare(right.className) || left.name.localeCompare(right.name);
       return left.name.localeCompare(right.name);
     });
+  const teacherAssignedClassNames = Array.from(new Set((teacherAssignments.data ?? []).map((assignment) => assignment.className)));
   const filteredTeacherSummaries = teacherSummaries
     .filter((teacher) => {
       const query = teacherSearch.trim().toLowerCase();
@@ -584,6 +572,99 @@ export function DashboardApp() {
       `${studentCount} students`
     ]);
   });
+  const overviewMetrics = isSuperAdmin || isSchoolAdmin
+    ? [
+        { label: "Enrollments", value: String(dashboard.data?.studentEnrollments ?? 0), detail: "Student enrollment activity across the tenant.", icon: <EnrollmentIcon /> },
+        { label: "Attendance", value: String(dashboard.data?.presentAttendanceRecords ?? 0), detail: "Present attendance entries currently tracked.", icon: <AttendanceIcon /> },
+        { label: "Collections", value: String(dashboard.data?.totalCollected ?? 0), detail: "Captured payments from the finance module.", icon: <CollectionsIcon /> }
+      ]
+    : isTeacher
+      ? [
+          { label: "My Classes", value: String(teacherAssignedClassNames.length), detail: "Classes assigned to you this term.", icon: <TeacherIcon /> },
+          { label: "My Students", value: String(studentSummaries.length), detail: "Students you can search and grade.", icon: <StudentIcon /> },
+          { label: "My Exams", value: String(exams.data?.length ?? 0), detail: "Assessments you can manage.", icon: <AcademicIcon /> }
+        ]
+      : isStudent
+        ? [
+            { label: "My Class", value: selectedStudent?.className ?? "Unassigned", detail: "Current class placement.", icon: <StudentIcon /> },
+            { label: "Report Rows", value: String(reportCard.data?.rows?.length ?? 0), detail: "Subjects and exams on your report card.", icon: <AcademicIcon /> },
+            { label: "Attendance", value: String(attendanceReport.data?.totalRecords ?? 0), detail: "Attendance records visible for your class.", icon: <AttendanceIcon /> }
+          ]
+        : [
+            { label: "Notifications", value: String(notifications.data?.length ?? 0), detail: "Alerts sent directly to this account.", icon: <CommsIcon /> },
+            { label: "Messages", value: String(messages.data?.length ?? 0), detail: "Conversation threads relevant to you.", icon: <UsersIcon /> },
+            { label: "Announcements", value: String(announcements.data?.content?.length ?? 0), detail: "Audience-filtered school updates.", icon: <SchoolIcon /> }
+          ];
+  const overviewBarItems = isSuperAdmin || isSchoolAdmin
+    ? [
+        { label: "Classes", value: dashboard.data?.classesCount ?? 0, color: "#d97706" },
+        { label: "Exams", value: dashboard.data?.examsCount ?? 0, color: "#0f766e" },
+        { label: "Teachers", value: dashboard.data?.teacherAssignments ?? 0, color: "#1d4ed8" },
+        { label: "Years", value: years.data?.length ?? 0, color: "#7c3aed" }
+      ]
+    : isTeacher
+      ? [
+          { label: "Classes", value: teacherAssignedClassNames.length, color: "#d97706" },
+          { label: "Subjects", value: teacherAssignments.data?.length ?? 0, color: "#0f766e" },
+          { label: "Students", value: studentSummaries.length, color: "#1d4ed8" },
+          { label: "Exams", value: exams.data?.length ?? 0, color: "#7c3aed" }
+        ]
+      : isStudent
+        ? [
+            { label: "Rows", value: reportCard.data?.rows?.length ?? 0, color: "#d97706" },
+            { label: "Total", value: Math.round(reportCard.data?.totalScore ?? 0), color: "#0f766e" },
+            { label: "Present", value: attendanceReport.data?.byStatus?.PRESENT ?? 0, color: "#1d4ed8" },
+            { label: "Absent", value: attendanceReport.data?.byStatus?.ABSENT ?? 0, color: "#dc2626" }
+          ]
+        : [
+            { label: "Alerts", value: notifications.data?.length ?? 0, color: "#d97706" },
+            { label: "Msgs", value: messages.data?.length ?? 0, color: "#0f766e" },
+            { label: "Posts", value: announcements.data?.content?.length ?? 0, color: "#1d4ed8" },
+            { label: "Unread", value: (notifications.data ?? []).filter((item) => item.status !== "SENT").length, color: "#7c3aed" }
+          ];
+  const overviewDonutSegments = isTeacher
+    ? [
+        { label: "Present", value: attendanceReport.data?.byStatus?.PRESENT ?? 0, color: "#15803d" },
+        { label: "Absent", value: attendanceReport.data?.byStatus?.ABSENT ?? 0, color: "#dc2626" }
+      ]
+    : isStudent
+      ? [
+          { label: "Present", value: attendanceReport.data?.byStatus?.PRESENT ?? 0, color: "#15803d" },
+          { label: "Absent", value: attendanceReport.data?.byStatus?.ABSENT ?? 0, color: "#dc2626" }
+        ]
+      : isParent
+        ? [
+            { label: "Messages", value: messages.data?.length ?? 0, color: "#15803d" },
+            { label: "Notifications", value: notifications.data?.length ?? 0, color: "#dc2626" }
+          ]
+        : [
+            { label: "Present", value: dashboard.data?.presentAttendanceRecords ?? 0, color: "#15803d" },
+            { label: "Absent", value: dashboard.data?.absentAttendanceRecords ?? 0, color: "#dc2626" }
+          ];
+  const overviewDonutTotal = overviewDonutSegments.reduce((sum, item) => sum + item.value, 0);
+  const overviewComparisonItems = isSuperAdmin || isSchoolAdmin
+    ? [
+        { label: "Invoiced", value: finance.data?.totalInvoiced ?? dashboard.data?.totalInvoiced ?? 0, color: "#b45309", format: formatCurrency },
+        { label: "Collected", value: finance.data?.totalCollected ?? dashboard.data?.totalCollected ?? 0, color: "#2563eb", format: formatCurrency },
+        { label: "Outstanding", value: finance.data?.outstandingBalance ?? Math.max((dashboard.data?.totalInvoiced ?? 0) - (dashboard.data?.totalCollected ?? 0), 0), color: "#111827", format: formatCurrency }
+      ]
+    : isTeacher
+      ? [
+          { label: "Assigned classes", value: teacherAssignedClassNames.length, color: "#b45309", format: formatNumber },
+          { label: "Assigned subjects", value: teacherAssignments.data?.length ?? 0, color: "#2563eb", format: formatNumber },
+          { label: "Searchable students", value: studentSummaries.length, color: "#111827", format: formatNumber }
+        ]
+      : isStudent
+        ? [
+            { label: "Report total", value: reportCard.data?.totalScore ?? 0, color: "#b45309", format: formatNumber },
+            { label: "Outstanding", value: outstanding.data?.totalOutstanding ?? 0, color: "#2563eb", format: formatCurrency },
+            { label: "Payments", value: payments.data?.length ?? 0, color: "#111827", format: formatNumber }
+          ]
+        : [
+            { label: "Messages", value: messages.data?.length ?? 0, color: "#b45309", format: formatNumber },
+            { label: "Notifications", value: notifications.data?.length ?? 0, color: "#2563eb", format: formatNumber },
+            { label: "Announcements", value: announcements.data?.content?.length ?? 0, color: "#111827", format: formatNumber }
+          ];
 
   useEffect(() => {
     if (!tabs.includes(tab)) {
@@ -747,21 +828,32 @@ export function DashboardApp() {
                   </p>
                 </section>
                 <section className="grid gap-4 md:grid-cols-3">
-                  <MetricCard detail="Student enrollment activity across the tenant." icon={<EnrollmentIcon />} label="Enrollments" value={String(dashboard.data?.studentEnrollments ?? 0)} />
-                  <MetricCard detail="Present attendance entries currently tracked." icon={<AttendanceIcon />} label="Attendance" value={String(dashboard.data?.presentAttendanceRecords ?? 0)} />
-                  <MetricCard detail="Captured payments from the finance module." icon={<CollectionsIcon />} label="Collections" value={String(dashboard.data?.totalCollected ?? 0)} />
+                  {overviewMetrics.map((metric) => (
+                    <MetricCard detail={metric.detail} icon={metric.icon} key={metric.label} label={metric.label} value={metric.value} />
+                  ))}
                 </section>
                 <div className="grid gap-6 xl:grid-cols-[1.2fr_0.9fr]">
                   <Panel subtitle="Analytics" title="Operating picture">
-                    <BarChart items={activityChart} title="Core academic operations" />
+                    <BarChart
+                      items={overviewBarItems}
+                      title={
+                        isTeacher
+                          ? "Assigned classroom workload"
+                          : isStudent
+                            ? "My learning snapshot"
+                            : isParent
+                              ? "My communication overview"
+                              : "Core academic operations"
+                      }
+                    />
                   </Panel>
-                  <Panel subtitle="Attendance" title="Presence mix">
-                    <DonutChart label="Attendance distribution" segments={attendanceChart} total={attendanceTotal} />
+                  <Panel subtitle={isParent ? "Inbox" : "Attendance"} title={isParent ? "Messages and alerts" : "Presence mix"}>
+                    <DonutChart label="Overview distribution" segments={overviewDonutSegments} total={overviewDonutTotal} />
                   </Panel>
                 </div>
                 <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-                  <Panel subtitle="Finance" title="Revenue health">
-                    <HorizontalComparisonChart items={financeChart} />
+                  <Panel subtitle={isTeacher ? "Teaching" : isStudent ? "Progress" : isParent ? "Visibility" : "Finance"} title={isTeacher ? "Teaching health" : isStudent ? "My current standing" : isParent ? "Family-facing view" : "Revenue health"}>
+                    <HorizontalComparisonChart items={overviewComparisonItems} />
                   </Panel>
                   <Panel subtitle="Comms" title="Recent announcements">
                     <Items values={(announcements.data?.content ?? []).map((item) => join([item.title, item.audience])).slice(0, 5)} />
@@ -955,7 +1047,7 @@ export function DashboardApp() {
 
             {tab === "students" ? (
               <div className="grid gap-6 lg:grid-cols-2">
-                <Panel subtitle="Roster" title={isTeacher ? "My students" : isStudent ? "Student profile" : isParent ? "Student overview" : "Student directory"}>
+                <Panel subtitle="Roster" title={isTeacher ? "My assigned students" : isStudent ? "Student profile" : isParent ? "Student overview" : "Student directory"}>
                   {!isStudent && !isParent ? (
                     <div className="flex flex-wrap gap-3">
                       {(isSchoolAdmin || isSuperAdmin || isTeacher) ? (
@@ -970,11 +1062,11 @@ export function DashboardApp() {
                     </div>
                   ) : null}
                   {!isStudent && !isParent ? (
-                    <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px]">
+                    <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_220px]">
                       <input
                         className="rounded-2xl border border-black/10 p-3"
                         onChange={(event) => setStudentSearch(event.target.value)}
-                        placeholder="Search student, email, class, or status"
+                        placeholder="Search students globally"
                         value={studentSearch}
                       />
                       <select
@@ -986,7 +1078,22 @@ export function DashboardApp() {
                         <option value="name-desc">Name Z-A</option>
                         <option value="class-asc">Class A-Z</option>
                       </select>
+                      <select
+                        className="rounded-2xl border border-black/10 p-3"
+                        onChange={(event) => setStudentClassFilter(event.target.value)}
+                        value={studentClassFilter}
+                      >
+                        <option value="ALL">All classes</option>
+                        {(isTeacher ? teacherAssignedClassNames : Array.from(new Set(studentSummaries.map((student) => student.className)))).map((className) => (
+                          <option key={className} value={className}>
+                            {className}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+                  ) : null}
+                  {isTeacher ? (
+                    <Items values={teacherAssignedClassNames.length ? teacherAssignedClassNames.map((className) => `Assigned class: ${className}`) : ["No class assignment for this term yet."]} />
                   ) : null}
                   <div className="mt-4">
                     <StudentList
@@ -1093,8 +1200,29 @@ export function DashboardApp() {
                             studentId: String(fd.get("studentId")),
                             score: Number(fd.get("score"))
                           }), [], "Score recorded.")}>
-                            <input className="w-full rounded-2xl border border-black/10 p-3" name="examId" placeholder="Exam ID" />
-                            <input className="w-full rounded-2xl border border-black/10 p-3" defaultValue={selectedStudent?.id ?? ""} name="studentId" placeholder="Student ID" />
+                            <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="examId">
+                              <option value="">Select exam</option>
+                              {(exams.data ?? [])
+                                .filter((exam) => {
+                                  const assignment = (teacherAssignments.data ?? []).find((item) => item.classId === exam.classId && item.subjectId === exam.subjectId && item.termId === exam.termId);
+                                  if (!isTeacher) return true;
+                                  return Boolean(assignment);
+                                })
+                                .filter((exam) => {
+                                  if (!selectedStudent) return true;
+                                  const enrollment = studentEnrollmentById.get(selectedStudent.id);
+                                  return !enrollment || exam.classId === enrollment.classId;
+                                })
+                                .map((exam) => {
+                                  const assignment = (teacherAssignments.data ?? []).find((item) => item.classId === exam.classId && item.subjectId === exam.subjectId && item.termId === exam.termId);
+                                  return (
+                                    <option key={exam.id} value={exam.id}>
+                                      {assignment ? `${assignment.termName} • ${assignment.className} • ${assignment.subjectName}` : exam.name}
+                                    </option>
+                                  );
+                                })}
+                            </select>
+                            <input className="w-full rounded-2xl border border-black/10 p-3" defaultValue={selectedStudent?.id ?? ""} name="studentId" placeholder="Student ID" type="hidden" />
                             <input className="w-full rounded-2xl border border-black/10 p-3" name="score" placeholder="Score" type="number" />
                             <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" type="submit">Record score</button>
                           </form>

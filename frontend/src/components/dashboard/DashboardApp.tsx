@@ -2,41 +2,31 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { registerSchoolAdmin } from "../../features/auth/api";
 import {
-  assignSubject,
-  createAcademicYear,
-  createAnnouncement,
-  createClass,
-  createExam,
-  createFeeStructure,
-  createInAppNotification,
-  createGradingScheme,
-  createSubject,
-  createTerm,
   createUser,
   downloadReportCard,
-  enrollStudent,
   fetchAcademicYears,
   fetchAnnouncements,
   fetchAttendanceReport,
   fetchClasses,
   fetchDashboardAnalytics,
   fetchEnrollments,
+  fetchExams,
   fetchFinanceSummary,
   fetchMessages,
+  fetchMySubjectAssignments,
   fetchNotifications,
   fetchOutstanding,
   fetchPaymentHistory,
   fetchRanking,
   fetchReportCard,
   fetchSchools,
+  fetchSubjectAssignments,
   fetchSubjects,
   fetchTerms,
   fetchUsers,
-  generateInvoices,
+  fetchVisibleUsers,
   markAttendance,
-  recordPayment,
   recordScore,
-  sendMessage,
   updateSchool,
   validateFileUpload
 } from "../../features/platform/api";
@@ -44,6 +34,10 @@ import { useAuthStore } from "../../store/auth";
 import type { FeatureFlag, PlatformRole, SubscriptionPlan } from "../../types";
 import { MetricCard } from "../MetricCard";
 import { Sidebar } from "../Sidebar";
+import { AcademicTab } from "./AcademicTab";
+import { CommsTab } from "./CommsTab";
+import { FinanceTab } from "./FinanceTab";
+import { Items, Panel } from "./shared";
 
 type Tab = "overview" | "tenants" | "users" | "teachers" | "students" | "academics" | "finance" | "comms";
 type FileBucket = "schoolLogo" | "studentPhoto" | "studentDocuments";
@@ -93,16 +87,6 @@ function bytes(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
-  return (
-    <section className="rounded-[2rem] border border-black/5 bg-white/88 p-6 shadow-sm backdrop-blur">
-      <p className="text-xs uppercase tracking-[0.2em] text-black/55">{subtitle}</p>
-      <h3 className="mt-2 font-display text-3xl">{title}</h3>
-      <div className="mt-5 space-y-4">{children}</div>
-    </section>
-  );
 }
 
 function formatNumber(value: number) {
@@ -265,20 +249,6 @@ function HorizontalComparisonChart({
         </div>
       ))}
     </div>
-  );
-}
-
-function Items({ values }: { values: string[] }) {
-  return values.length ? (
-    <div className="space-y-2">
-      {values.map((value) => (
-        <div key={value} className="rounded-2xl bg-sand/60 p-3 text-sm text-black/80">
-          {value}
-        </div>
-      ))}
-    </div>
-  ) : (
-    <p className="text-sm text-black/50">No records yet.</p>
   );
 }
 
@@ -454,21 +424,55 @@ export function DashboardApp() {
   const dashboard = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchDashboardAnalytics(session) });
   const announcements = useQuery({ queryKey: ["announcements"], queryFn: () => fetchAnnouncements(session) });
   const schools = useQuery({ queryKey: ["schools"], enabled: isSuperAdmin, queryFn: () => fetchSchools(session) });
-  const users = useQuery({ queryKey: ["users"], queryFn: () => fetchUsers(session) });
+  const users = useQuery({ queryKey: ["users"], enabled: isSchoolAdmin || isSuperAdmin, queryFn: () => fetchUsers(session) });
+  const visibleUsers = useQuery({
+    queryKey: ["visible-users"],
+    enabled: !isSchoolAdmin && !isSuperAdmin,
+    queryFn: () => fetchVisibleUsers(session)
+  });
   const years = useQuery({ queryKey: ["years"], queryFn: () => fetchAcademicYears(session) });
   const terms = useQuery({ queryKey: ["terms"], queryFn: () => fetchTerms(session) });
   const classes = useQuery({ queryKey: ["classes"], queryFn: () => fetchClasses(session) });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => fetchSubjects(session) });
+  const subjectAssignments = useQuery({
+    queryKey: ["subject-assignments"],
+    enabled: isSchoolAdmin || isSuperAdmin,
+    queryFn: () => fetchSubjectAssignments(session)
+  });
+  const teacherAssignments = useQuery({
+    queryKey: ["my-subject-assignments"],
+    enabled: isTeacher,
+    queryFn: () => fetchMySubjectAssignments(session)
+  });
   const enrollments = useQuery({ queryKey: ["enrollments"], queryFn: () => fetchEnrollments(session) });
-  const finance = useQuery({ queryKey: ["finance"], queryFn: () => fetchFinanceSummary(session) });
+  const exams = useQuery({
+    queryKey: ["exams"],
+    enabled: isSchoolAdmin || isSuperAdmin || isTeacher,
+    queryFn: () => fetchExams(session)
+  });
+  const finance = useQuery({
+    queryKey: ["finance"],
+    enabled: isSchoolAdmin || isSuperAdmin,
+    queryFn: () => fetchFinanceSummary(session)
+  });
   const notifications = useQuery({ queryKey: ["notifications"], queryFn: () => fetchNotifications(session) });
   const messages = useQuery({ queryKey: ["messages"], queryFn: () => fetchMessages(session) });
 
-  const defaultClassId = classes.data?.[0]?.id ?? "";
+  const visibleUserList = isSchoolAdmin || isSuperAdmin ? (users.data ?? []) : (visibleUsers.data ?? []);
+  const studentUsers = visibleUserList.filter((person) => person.role === "STUDENT");
+  const teacherUsers = (users.data ?? []).filter((person) => person.role === "TEACHER");
+  const studentEnrollmentById = new Map((enrollments.data ?? []).map((item) => [item.studentId, item]));
+  const classById = new Map((classes.data ?? []).map((item) => [item.id, item]));
+  const defaultClassId = useMemo(() => {
+    if (isTeacher) return teacherAssignments.data?.[0]?.classId ?? "";
+    if (isStudent) return studentEnrollmentById.get(user.id)?.classId ?? "";
+    return classes.data?.[0]?.id ?? "";
+  }, [classes.data, isStudent, isTeacher, studentEnrollmentById, teacherAssignments.data, user.id]);
   const defaultStudentId = useMemo(() => {
     if (isStudent) return user.id;
+    if (isTeacher) return studentUsers[0]?.id ?? "";
     return users.data?.find((person) => person.role === "STUDENT")?.id ?? "";
-  }, [isStudent, user.id, users.data]);
+  }, [isStudent, isTeacher, studentUsers, user.id, users.data]);
   const reportStartDate = thirtyDaysAgo();
   const reportEndDate = today();
 
@@ -489,12 +493,12 @@ export function DashboardApp() {
   });
   const outstanding = useQuery({
     queryKey: ["outstanding", defaultStudentId],
-    enabled: Boolean(defaultStudentId) && !isTeacher,
+    enabled: Boolean(defaultStudentId) && !isTeacher && !isParent,
     queryFn: () => fetchOutstanding(session, defaultStudentId)
   });
   const payments = useQuery({
     queryKey: ["payments-history", defaultStudentId],
-    enabled: Boolean(defaultStudentId) && !isTeacher,
+    enabled: Boolean(defaultStudentId) && !isTeacher && !isParent,
     queryFn: () => fetchPaymentHistory(session, defaultStudentId)
   });
 
@@ -514,10 +518,6 @@ export function DashboardApp() {
     { label: "Collected", value: finance.data?.totalCollected ?? dashboard.data?.totalCollected ?? 0, color: "#2563eb", format: formatCurrency },
     { label: "Outstanding", value: finance.data?.outstandingBalance ?? Math.max((dashboard.data?.totalInvoiced ?? 0) - (dashboard.data?.totalCollected ?? 0), 0), color: "#111827", format: formatCurrency }
   ];
-  const studentUsers = (users.data ?? []).filter((person) => person.role === "STUDENT");
-  const teacherUsers = (users.data ?? []).filter((person) => person.role === "TEACHER");
-  const studentEnrollmentById = new Map((enrollments.data ?? []).map((item) => [item.studentId, item]));
-  const classById = new Map((classes.data ?? []).map((item) => [item.id, item]));
   const studentSummaries: StudentSummary[] = studentUsers.map((student) => {
     const enrollment = studentEnrollmentById.get(student.id);
     const assignedClass = enrollment ? classById.get(enrollment.classId) : null;
@@ -1137,312 +1137,59 @@ export function DashboardApp() {
             ) : null}
 
             {tab === "academics" ? (
-              <div className="grid gap-6 lg:grid-cols-2">
-                {isSchoolAdmin || isSuperAdmin ? (
-                  <>
-                    <Panel subtitle="Class directory" title="Classes and staffing">
-                      <Items values={classDetailItems} />
-                    </Panel>
-                    <Panel subtitle="Years and classes" title="Academic setup">
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createAcademicYear(session, {
-                        name: String(fd.get("name")),
-                        startDate: String(fd.get("startDate")),
-                        endDate: String(fd.get("endDate")),
-                        active: fd.get("active") === "on"
-                      }), ["years"], "Academic year created.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Academic year" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="startDate" type="date" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="endDate" type="date" />
-                        <label className="flex items-center gap-2 text-sm"><input name="active" type="checkbox" />Active</label>
-                        <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create year</button>
-                      </form>
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createClass(session, {
-                        name: String(fd.get("name")),
-                        levelName: String(fd.get("levelName")),
-                        classTeacherId: String(fd.get("classTeacherId") || "")
-                      }), ["classes"], "Class created.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Class name" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="levelName" placeholder="Level" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="classTeacherId" placeholder="Teacher ID" />
-                        <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" type="submit">Create class</button>
-                      </form>
-                    </Panel>
-                    <Panel subtitle="At a glance" title="Academic activity">
-                      <Items values={[
-                        `Academic years: ${years.data?.length ?? 0}`,
-                        `Classes: ${classes.data?.length ?? 0}`,
-                        `Terms: ${terms.data?.length ?? 0}`,
-                        `Subjects: ${subjects.data?.length ?? 0}`,
-                        `Attendance tracked: ${dashboard.data?.presentAttendanceRecords ?? 0}`,
-                        `Exams tracked: ${dashboard.data?.examsCount ?? 0}`
-                      ]} />
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createExam(session, {
-                        name: String(fd.get("name")),
-                        subjectId: String(fd.get("subjectId")),
-                        classId: String(fd.get("classId")),
-                        termId: String(fd.get("termId")),
-                        maxScore: Number(fd.get("maxScore")),
-                        examDate: String(fd.get("examDate"))
-                      }), [], "Exam created.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Exam name" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="subjectId" placeholder="Subject ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="classId" placeholder="Class ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="termId" placeholder="Term ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="maxScore" placeholder="Max score" type="number" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="examDate" type="date" />
-                        <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create exam</button>
-                      </form>
-                    </Panel>
-
-                    <Panel subtitle="Terms and subjects" title="Curriculum structure">
-                      <Items values={[
-                        `Terms configured: ${terms.data?.length ?? 0}`,
-                        `Subjects configured: ${subjects.data?.length ?? 0}`
-                      ]} />
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createTerm(session, {
-                        academicYearId: String(fd.get("academicYearId")),
-                        name: String(fd.get("name")),
-                        startDate: String(fd.get("startDate")),
-                        endDate: String(fd.get("endDate"))
-                      }), ["terms"], "Term created.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="academicYearId" placeholder="Academic year ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Term name" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="startDate" type="date" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="endDate" type="date" />
-                        <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create term</button>
-                      </form>
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createSubject(session, {
-                        name: String(fd.get("name")),
-                        code: String(fd.get("code"))
-                      }), ["subjects"], "Subject created.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Subject name" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="code" placeholder="Subject code" />
-                        <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" type="submit">Create subject</button>
-                      </form>
-                    </Panel>
-
-                    <Panel subtitle="Assignments" title="Teachers and enrollment">
-                      <Items values={[
-                        `Enrollments: ${enrollments.data?.length ?? 0}`,
-                        `Teacher assignments: ${dashboard.data?.teacherAssignments ?? 0}`,
-                        `Students listed: ${studentUsers.length}`
-                      ]} />
-                      <Items values={studentDetailItems.slice(0, 6)} />
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => assignSubject(session, {
-                        subjectId: String(fd.get("subjectId")),
-                        teacherId: String(fd.get("teacherId")),
-                        classId: String(fd.get("classId"))
-                      }), [], "Subject assigned.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="subjectId" placeholder="Subject ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="teacherId" placeholder="Teacher ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="classId" placeholder="Class ID" />
-                        <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Assign subject</button>
-                      </form>
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => enrollStudent(session, {
-                        studentId: String(fd.get("studentId")),
-                        classId: String(fd.get("classId")),
-                        academicYearId: String(fd.get("academicYearId"))
-                      }), ["enrollments"], "Student enrolled.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="studentId" placeholder="Student ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="classId" placeholder="Class ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="academicYearId" placeholder="Academic year ID" />
-                        <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" type="submit">Enroll student</button>
-                      </form>
-                    </Panel>
-
-                    <Panel subtitle="Grading" title="Grading scales">
-                      <Items values={[
-                        `Ranking entries: ${ranking.data?.length ?? 0}`,
-                        `Report card rows: ${reportCard.data?.rows?.length ?? 0}`
-                      ]} />
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createGradingScheme(session, {
-                        minScore: Number(fd.get("minScore")),
-                        maxScore: Number(fd.get("maxScore")),
-                        letterGrade: String(fd.get("letterGrade")),
-                        gradePoint: Number(fd.get("gradePoint"))
-                      }), [], "Grading scheme created.")}>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <input className="rounded-2xl border border-black/10 p-3" name="minScore" placeholder="Min score" type="number" />
-                          <input className="rounded-2xl border border-black/10 p-3" name="maxScore" placeholder="Max score" type="number" />
-                          <input className="rounded-2xl border border-black/10 p-3" name="letterGrade" placeholder="Letter grade" />
-                          <input className="rounded-2xl border border-black/10 p-3" name="gradePoint" placeholder="Grade point" type="number" />
-                        </div>
-                        <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create grading scheme</button>
-                      </form>
-                    </Panel>
-                  </>
-                ) : (
-                  <>
-                    <Panel subtitle="Academic view" title={isTeacher ? "Classroom snapshot" : "Learning snapshot"}>
-                      <Items values={[
-                        `Academic years: ${years.data?.length ?? 0}`,
-                        `Classes available: ${classes.data?.length ?? 0}`,
-                        `Exams scheduled: ${dashboard.data?.examsCount ?? 0}`,
-                        `Attendance tracked: ${dashboard.data?.presentAttendanceRecords ?? 0}`
-                      ]} />
-                    </Panel>
-                    <Panel subtitle="Access" title={isTeacher ? "Teacher permissions" : "Student permissions"}>
-                      <Items values={isTeacher ? [
-                        "Teachers can review academic activity and communicate with families.",
-                        "School-wide setup actions stay restricted to school administrators."
-                      ] : [
-                        "Students can review learning progress, announcements, and finance status.",
-                        "Administrative setup and user management stay hidden."
-                      ]} />
-                    </Panel>
-                    <Panel subtitle="Performance" title="Reports and ranking">
-                      <Items values={[
-                        `Class ranking entries: ${ranking.data?.length ?? 0}`,
-                        `Report card rows: ${reportCard.data?.rows?.length ?? 0}`,
-                        `Report card total: ${String(reportCard.data?.totalScore ?? 0)}`
-                      ]} />
-                      {defaultStudentId ? (
-                        <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" onClick={() => handleReportCardDownload(defaultStudentId)} type="button">
-                          Download report card PDF
-                        </button>
-                      ) : null}
-                    </Panel>
-                  </>
-                )}
-              </div>
+              <AcademicTab
+                classDetailItems={classDetailItems}
+                classes={classes.data ?? []}
+                dashboard={dashboard.data}
+                defaultStudentId={defaultStudentId}
+                enrollments={enrollments.data ?? []}
+                exams={exams.data ?? []}
+                handle={handle}
+                handleReportCardDownload={handleReportCardDownload}
+                isSchoolAdmin={isSchoolAdmin}
+                isSuperAdmin={isSuperAdmin}
+                isTeacher={isTeacher}
+                ranking={ranking.data ?? []}
+                reportCard={reportCard.data}
+                session={session}
+                studentDetailItems={studentDetailItems}
+                studentUsers={studentUsers}
+                subjectAssignments={subjectAssignments.data ?? []}
+                subjects={subjects.data ?? []}
+                teacherAssignments={teacherAssignments.data ?? []}
+                teacherUsers={teacherUsers}
+                terms={terms.data ?? []}
+                years={years.data ?? []}
+              />
             ) : null}
 
             {tab === "finance" ? (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Panel subtitle="Fees and collections" title="Finance summary">
-                  <Items values={[
-                    `Invoiced: ${finance.data?.totalInvoiced ?? 0}`,
-                    `Collected: ${finance.data?.totalCollected ?? 0}`,
-                    `Outstanding: ${finance.data?.outstandingBalance ?? 0}`
-                  ]} />
-                </Panel>
-                <Panel subtitle="Student finance" title="Outstanding balances">
-                  <Items values={[
-                    `Reference student: ${defaultStudentId || "No student available"}`,
-                    `Outstanding total: ${String(outstanding.data?.totalOutstanding ?? 0)}`,
-                    `Invoices: ${outstanding.data?.invoices?.length ?? 0}`,
-                    `Payments: ${payments.data?.length ?? 0}`
-                  ]} />
-                  <Items values={(outstanding.data?.invoices ?? []).slice(0, 4).map((invoice) => join([
-                    invoice.id,
-                    formatCurrency(invoice.amount),
-                    invoice.status
-                  ]))} />
-                </Panel>
-                {isSchoolAdmin || isSuperAdmin ? (
-                  <>
-                    <Panel subtitle="Finance operations" title="Create fee structure">
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createFeeStructure(session, {
-                        name: String(fd.get("name")),
-                        classId: String(fd.get("classId")),
-                        amount: Number(fd.get("amount")),
-                        dueDate: String(fd.get("dueDate"))
-                      }), ["finance"], "Fee structure created.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Fee structure name" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="classId" placeholder="Class ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="amount" placeholder="Amount" type="number" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="dueDate" type="date" />
-                        <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create fee structure</button>
-                      </form>
-                    </Panel>
-                    <Panel subtitle="Billing actions" title="Invoices and payments">
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => generateInvoices(session, {
-                        feeStructureId: String(fd.get("feeStructureId")),
-                        classId: String(fd.get("classId"))
-                      }), ["finance"], "Invoices generated.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="feeStructureId" placeholder="Fee structure ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="classId" placeholder="Class ID" />
-                        <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" type="submit">Generate invoices</button>
-                      </form>
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => recordPayment(session, {
-                        invoiceId: String(fd.get("invoiceId")),
-                        studentId: String(fd.get("studentId")),
-                        amount: Number(fd.get("amount")),
-                        reference: String(fd.get("reference"))
-                      }), ["finance"], "Payment recorded.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="invoiceId" placeholder="Invoice ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="studentId" placeholder="Student ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="amount" placeholder="Amount" type="number" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="reference" placeholder="Payment reference" />
-                        <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Record payment</button>
-                      </form>
-                    </Panel>
-                  </>
-                ) : (
-                  <Panel subtitle="Finance access" title={isParent ? "Family billing visibility" : "Student billing visibility"}>
-                    <p className="text-sm leading-7 text-black/70">
-                      {isParent
-                        ? "Parents can review billing status and school updates, but fee structures remain school-admin only."
-                        : "Students can see billing health and payment status, but fee setup remains school-admin only."}
-                    </p>
-                    <Items values={(payments.data ?? []).slice(0, 4).map((payment) => join([
-                      payment.reference,
-                      formatCurrency(payment.amount)
-                    ]))} />
-                  </Panel>
-                )}
-              </div>
+              <FinanceTab
+                defaultStudentId={defaultStudentId}
+                finance={finance.data}
+                formatCurrency={formatCurrency}
+                handle={handle}
+                isParent={isParent}
+                isSchoolAdmin={isSchoolAdmin}
+                isSuperAdmin={isSuperAdmin}
+                outstanding={outstanding.data}
+                payments={payments.data ?? []}
+                session={session}
+              />
             ) : null}
 
             {tab === "comms" ? (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Panel subtitle="Notifications" title="Announcements and alerts">
-                  <Items values={(notifications.data ?? []).map((item) => join([item.subject, item.status]))} />
-                  {isSchoolAdmin || isSuperAdmin || isTeacher ? (
-                    <>
-                      {(isSchoolAdmin || isSuperAdmin) ? (
-                        <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createAnnouncement(session, {
-                          title: String(fd.get("title")),
-                          content: String(fd.get("content")),
-                          audience: String(fd.get("audience"))
-                        }), ["announcements"], "Announcement created.")}>
-                          <input className="w-full rounded-2xl border border-black/10 p-3" name="title" placeholder="Announcement title" />
-                          <textarea className="w-full rounded-2xl border border-black/10 p-3" name="content" placeholder="Content" rows={4} />
-                          <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="SCHOOL_WIDE" name="audience">
-                            <option>SCHOOL_WIDE</option>
-                            <option>TEACHERS</option>
-                            <option>STUDENTS</option>
-                            <option>PARENTS</option>
-                            <option>CLASS_SPECIFIC</option>
-                          </select>
-                          <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create announcement</button>
-                        </form>
-                      ) : null}
-                      <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createInAppNotification(session, {
-                        recipientUserId: String(fd.get("recipientUserId")),
-                        subject: String(fd.get("subject")),
-                        content: String(fd.get("content"))
-                      }), ["notifications"], "In-app notification queued.")}>
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="recipientUserId" placeholder="Recipient user ID" />
-                        <input className="w-full rounded-2xl border border-black/10 p-3" name="subject" placeholder="Subject" />
-                        <textarea className="w-full rounded-2xl border border-black/10 p-3" name="content" placeholder="Content" rows={3} />
-                        <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" type="submit">Send notification</button>
-                      </form>
-                    </>
-                  ) : (
-                    <p className="text-sm leading-7 text-black/70">
-                      This role can review notifications but cannot publish school-wide alerts.
-                    </p>
-                  )}
-                </Panel>
-                <Panel subtitle="Teacher-parent communication" title="Messages">
-                  <Items values={(messages.data ?? []).map((item) => join([item.senderUserId, item.recipientUserId, item.body]))} />
-                  {isStudent ? (
-                    <p className="text-sm leading-7 text-black/70">
-                      Student messaging is currently view-only. Teacher, parent, and admin roles can send new messages.
-                    </p>
-                  ) : (
-                    <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => sendMessage(session, {
-                      recipientUserId: String(fd.get("recipientUserId")),
-                      body: String(fd.get("body"))
-                    }), ["messages"], "Message sent.")}>
-                      <input className="w-full rounded-2xl border border-black/10 p-3" name="recipientUserId" placeholder="Recipient user ID" />
-                      <textarea className="w-full rounded-2xl border border-black/10 p-3" name="body" placeholder="Message body" rows={4} />
-                      <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Send message</button>
-                    </form>
-                  )}
-                </Panel>
-              </div>
+              <CommsTab
+                announcements={announcements.data?.content ?? []}
+                handle={handle}
+                isSchoolAdmin={isSchoolAdmin}
+                isStudent={isStudent}
+                isSuperAdmin={isSuperAdmin}
+                isTeacher={isTeacher}
+                messages={messages.data ?? []}
+                notifications={notifications.data ?? []}
+                session={session}
+              />
             ) : null}
           </div>
         </main>

@@ -1,6 +1,7 @@
 package com.acadex.finance.service;
 
 import com.acadex.academic.repository.StudentEnrollmentRepository;
+import com.acadex.auth.security.AcadexUserPrincipal;
 import com.acadex.audit.service.AuditService;
 import com.acadex.feature.model.FeatureFlag;
 import com.acadex.feature.service.FeatureAccessService;
@@ -20,14 +21,18 @@ import com.acadex.finance.repository.FeeStructureRepository;
 import com.acadex.finance.repository.InvoiceRepository;
 import com.acadex.finance.repository.PaymentRecordRepository;
 import com.acadex.notification.service.NotificationService;
+import com.acadex.security.AccessScopeService;
 import com.acadex.school.model.School;
 import com.acadex.school.repository.SchoolRepository;
 import com.acadex.tenant.TenantAccessService;
+import com.acadex.user.model.PlatformRole;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Service
 public class FinanceService {
@@ -41,6 +46,7 @@ public class FinanceService {
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final AuditService auditService;
     private final NotificationService notificationService;
+    private final AccessScopeService accessScopeService;
 
     public FinanceService(
             TenantAccessService tenantAccessService,
@@ -51,7 +57,8 @@ public class FinanceService {
             PaymentRecordRepository paymentRecordRepository,
             StudentEnrollmentRepository studentEnrollmentRepository,
             AuditService auditService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            AccessScopeService accessScopeService
     ) {
         this.tenantAccessService = tenantAccessService;
         this.featureAccessService = featureAccessService;
@@ -62,6 +69,7 @@ public class FinanceService {
         this.studentEnrollmentRepository = studentEnrollmentRepository;
         this.auditService = auditService;
         this.notificationService = notificationService;
+        this.accessScopeService = accessScopeService;
     }
 
     @Transactional
@@ -118,8 +126,9 @@ public class FinanceService {
     }
 
     @Transactional(readOnly = true)
-    public OutstandingResponse outstanding(UUID studentId) {
+    public OutstandingResponse outstanding(UUID studentId, AcadexUserPrincipal principal) {
         UUID tenantId = requireFinanceTenant();
+        ensureFinanceAccess(tenantId, studentId, principal);
         List<Invoice> invoices = invoiceRepository.findAllByTenantIdAndStudentId(tenantId, studentId);
         List<InvoiceResponse> mapped = invoices.stream()
                 .map(invoice -> new InvoiceResponse(invoice.getId(), invoice.getStudentId(), invoice.getFeeStructureId(), invoice.getAmount(), invoice.getStatus()))
@@ -132,16 +141,20 @@ public class FinanceService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentResponse> paymentHistory(UUID studentId) {
+    public List<PaymentResponse> paymentHistory(UUID studentId, AcadexUserPrincipal principal) {
         UUID tenantId = requireFinanceTenant();
+        ensureFinanceAccess(tenantId, studentId, principal);
         return paymentRecordRepository.findAllByTenantIdAndStudentId(tenantId, studentId).stream()
                 .map(payment -> new PaymentResponse(payment.getId(), payment.getInvoiceId(), payment.getStudentId(), payment.getAmount(), payment.getReference()))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public FinancialReportResponse financialReport() {
+    public FinancialReportResponse financialReport(AcadexUserPrincipal principal) {
         UUID tenantId = requireFinanceTenant();
+        if (principal.getRole() != PlatformRole.SCHOOL_ADMIN && principal.getRole() != PlatformRole.SUPER_ADMIN) {
+            throw new ResponseStatusException(FORBIDDEN, "You cannot view school-wide finance reports.");
+        }
         List<Invoice> invoices = invoiceRepository.findAllByTenantId(tenantId);
         double invoiced = invoices.stream().mapToDouble(Invoice::getAmount).sum();
         double collected = paymentRecordRepository.findAll().stream()
@@ -156,5 +169,11 @@ public class FinanceService {
         School school = schoolRepository.findById(tenantId).orElseThrow();
         featureAccessService.requireFeature(school, FeatureFlag.ENABLE_FINANCE_MODULE);
         return tenantId;
+    }
+
+    private void ensureFinanceAccess(UUID tenantId, UUID studentId, AcadexUserPrincipal principal) {
+        if (!accessScopeService.canAccessStudent(tenantId, studentId, principal)) {
+            throw new ResponseStatusException(FORBIDDEN, "You cannot view finance records for this student.");
+        }
     }
 }

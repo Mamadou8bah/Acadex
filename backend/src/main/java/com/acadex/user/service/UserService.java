@@ -2,9 +2,11 @@ package com.acadex.user.service;
 
 import com.acadex.audit.service.AuditService;
 import com.acadex.auth.model.VerificationTokenType;
+import com.acadex.auth.security.AcadexUserPrincipal;
 import com.acadex.auth.repository.VerificationTokenRepository;
 import com.acadex.common.api.PageResponse;
 import com.acadex.email.service.EmailService;
+import com.acadex.security.AccessScopeService;
 import com.acadex.tenant.TenantAccessService;
 import com.acadex.user.api.CreateUserRequest;
 import com.acadex.user.api.ProfileUpdateRequest;
@@ -17,6 +19,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -35,6 +39,7 @@ public class UserService {
     private final VerificationTokenRepository verificationTokenRepository;
     private final AuditService auditService;
     private final TenantAccessService tenantAccessService;
+    private final AccessScopeService accessScopeService;
 
     public UserService(
             UserAccountRepository userAccountRepository,
@@ -42,7 +47,8 @@ public class UserService {
             EmailService emailService,
             VerificationTokenRepository verificationTokenRepository,
             AuditService auditService,
-            TenantAccessService tenantAccessService
+            TenantAccessService tenantAccessService,
+            AccessScopeService accessScopeService
     ) {
         this.userAccountRepository = userAccountRepository;
         this.passwordEncoder = passwordEncoder;
@@ -50,6 +56,7 @@ public class UserService {
         this.verificationTokenRepository = verificationTokenRepository;
         this.auditService = auditService;
         this.tenantAccessService = tenantAccessService;
+        this.accessScopeService = accessScopeService;
     }
 
     @Transactional(readOnly = true)
@@ -63,6 +70,29 @@ public class UserService {
                 users.getTotalElements(),
                 users.getTotalPages()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> listVisibleUsers(AcadexUserPrincipal principal) {
+        UUID tenantId = tenantAccessService.requireTenant();
+        if (principal.getRole() == com.acadex.user.model.PlatformRole.SCHOOL_ADMIN || principal.getRole() == com.acadex.user.model.PlatformRole.SUPER_ADMIN) {
+            return userAccountRepository.findAllByTenantId(tenantId).stream().map(this::map).toList();
+        }
+
+        if (principal.getRole() == com.acadex.user.model.PlatformRole.TEACHER) {
+            LinkedHashSet<UUID> visibleIds = new LinkedHashSet<>();
+            visibleIds.add(principal.getUserId());
+            visibleIds.addAll(accessScopeService.accessibleStudentIds(tenantId, principal));
+            return userAccountRepository.findAllByTenantId(tenantId).stream()
+                    .filter(user -> visibleIds.contains(user.getId()))
+                    .map(this::map)
+                    .toList();
+        }
+
+        return userAccountRepository.findAllByTenantId(tenantId).stream()
+                .filter(user -> user.getId().equals(principal.getUserId()))
+                .map(this::map)
+                .toList();
     }
 
     @Transactional

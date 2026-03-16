@@ -31,20 +31,21 @@ public class AttendanceController {
     @PostMapping("/records")
     @PreAuthorize("hasRole('TEACHER') or hasRole('SCHOOL_ADMIN') or hasRole('SUPER_ADMIN')")
     public AttendanceRecordResponse mark(@RequestBody MarkAttendanceRequest request, @AuthenticationPrincipal AcadexUserPrincipal principal) {
-        return attendanceService.markAttendance(request, principal.getUserId());
+        return attendanceService.markAttendance(request, principal);
     }
 
     @GetMapping("/students/{studentId}/history")
-    public List<AttendanceRecordResponse> history(@PathVariable UUID studentId) {
-        return attendanceService.history(studentId);
+    public List<AttendanceRecordResponse> history(@PathVariable UUID studentId, @AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return attendanceService.history(studentId, principal);
     }
 
     @GetMapping("/classes/{classId}/report")
     public AttendanceReportResponse report(
             @PathVariable UUID classId,
             @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate
+            @RequestParam LocalDate endDate,
+            @AuthenticationPrincipal AcadexUserPrincipal principal
     ) {
-        return attendanceService.report(classId, startDate, endDate);
+        return attendanceService.report(classId, startDate, endDate, principal);
     }
 }

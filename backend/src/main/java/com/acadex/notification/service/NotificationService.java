@@ -1,5 +1,6 @@
 package com.acadex.notification.service;
 
+import com.acadex.auth.security.AcadexUserPrincipal;
 import com.acadex.notification.api.CreateInAppNotificationRequest;
 import com.acadex.notification.api.NotificationResponse;
 import com.acadex.notification.model.NotificationChannel;
@@ -58,9 +59,13 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
-    public List<NotificationResponse> recentInApp() {
+    public List<NotificationResponse> recentInApp(AcadexUserPrincipal principal) {
         UUID tenantId = tenantAccessService.requireTenant();
-        return notificationOutboxRepository.findTop20ByTenantIdAndChannelOrderByCreatedAtDesc(tenantId, NotificationChannel.IN_APP).stream()
+        return notificationOutboxRepository.findTop20ByTenantIdAndRecipientUserIdAndChannelOrderByCreatedAtDesc(
+                        tenantId,
+                        principal.getUserId(),
+                        NotificationChannel.IN_APP
+                ).stream()
                 .map(item -> new NotificationResponse(item.getId(), item.getRecipientUserId(), item.getChannel(), item.getStatus(), item.getSubject(), item.getContent()))
                 .toList();
     }

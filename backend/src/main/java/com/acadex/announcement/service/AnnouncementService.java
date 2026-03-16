@@ -5,9 +5,11 @@ import com.acadex.announcement.api.CreateAnnouncementRequest;
 import com.acadex.announcement.model.Announcement;
 import com.acadex.announcement.model.AnnouncementAudience;
 import com.acadex.announcement.repository.AnnouncementRepository;
+import com.acadex.auth.security.AcadexUserPrincipal;
 import com.acadex.audit.service.AuditService;
 import com.acadex.common.api.PageResponse;
 import com.acadex.notification.service.NotificationService;
+import com.acadex.security.AccessScopeService;
 import com.acadex.tenant.TenantAccessService;
 import com.acadex.user.repository.UserAccountRepository;
 import java.time.OffsetDateTime;
@@ -27,31 +29,39 @@ public class AnnouncementService {
     private final UserAccountRepository userAccountRepository;
     private final AuditService auditService;
     private final TenantAccessService tenantAccessService;
+    private final AccessScopeService accessScopeService;
 
     public AnnouncementService(
             AnnouncementRepository announcementRepository,
             NotificationService notificationService,
             UserAccountRepository userAccountRepository,
             AuditService auditService,
-            TenantAccessService tenantAccessService
+            TenantAccessService tenantAccessService,
+            AccessScopeService accessScopeService
     ) {
         this.announcementRepository = announcementRepository;
         this.notificationService = notificationService;
         this.userAccountRepository = userAccountRepository;
         this.auditService = auditService;
         this.tenantAccessService = tenantAccessService;
+        this.accessScopeService = accessScopeService;
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "tenant-announcements", key = "#page + '-' + #size + '-' + T(com.acadex.tenant.TenantContext).getTenantId().orElse(null)")
-    public PageResponse<AnnouncementResponse> listAnnouncements(int page, int size) {
+    @Cacheable(value = "tenant-announcements", key = "#page + '-' + #size + '-' + #principal.role + '-' + T(com.acadex.tenant.TenantContext).getTenantId().orElse(null)")
+    public PageResponse<AnnouncementResponse> listAnnouncements(int page, int size, AcadexUserPrincipal principal) {
         UUID tenantId = tenantAccessService.requireTenant();
         Page<Announcement> announcements = announcementRepository.findAllByTenantIdOrderByPublishAtDesc(tenantId, PageRequest.of(page, size));
+        var allowedAudiences = accessScopeService.allowedAudiences(principal.getRole());
+        var visibleAnnouncements = announcements.getContent().stream()
+                .filter(item -> allowedAudiences.contains(item.getAudience()))
+                .map(this::map)
+                .toList();
         return new PageResponse<>(
-                announcements.getContent().stream().map(this::map).toList(),
+                visibleAnnouncements,
                 announcements.getNumber(),
                 announcements.getSize(),
-                announcements.getTotalElements(),
+                visibleAnnouncements.size(),
                 announcements.getTotalPages()
         );
     }

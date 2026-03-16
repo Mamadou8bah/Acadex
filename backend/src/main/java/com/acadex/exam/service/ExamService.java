@@ -1,6 +1,8 @@
 package com.acadex.exam.service;
 
 import com.acadex.audit.service.AuditService;
+import com.acadex.academic.repository.SubjectAssignmentRepository;
+import com.acadex.auth.security.AcadexUserPrincipal;
 import com.acadex.exam.api.ExamRequests.CreateExamRequest;
 import com.acadex.exam.api.ExamRequests.CreateGradingSchemeRequest;
 import com.acadex.exam.api.ExamRequests.RecordScoreRequest;
@@ -17,6 +19,7 @@ import com.acadex.exam.repository.ExamRepository;
 import com.acadex.exam.repository.GradingSchemeRepository;
 import com.acadex.exam.repository.StudentScoreRepository;
 import com.acadex.notification.service.NotificationService;
+import com.acadex.security.AccessScopeService;
 import com.acadex.tenant.TenantAccessService;
 import com.acadex.user.model.PlatformRole;
 import com.acadex.user.repository.UserAccountRepository;
@@ -34,6 +37,10 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 public class ExamService {
@@ -45,6 +52,8 @@ public class ExamService {
     private final StudentScoreRepository studentScoreRepository;
     private final UserAccountRepository userAccountRepository;
     private final NotificationService notificationService;
+    private final SubjectAssignmentRepository subjectAssignmentRepository;
+    private final AccessScopeService accessScopeService;
 
     public ExamService(
             TenantAccessService tenantAccessService,
@@ -53,7 +62,9 @@ public class ExamService {
             GradingSchemeRepository gradingSchemeRepository,
             StudentScoreRepository studentScoreRepository,
             UserAccountRepository userAccountRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            SubjectAssignmentRepository subjectAssignmentRepository,
+            AccessScopeService accessScopeService
     ) {
         this.tenantAccessService = tenantAccessService;
         this.auditService = auditService;
@@ -62,11 +73,14 @@ public class ExamService {
         this.studentScoreRepository = studentScoreRepository;
         this.userAccountRepository = userAccountRepository;
         this.notificationService = notificationService;
+        this.subjectAssignmentRepository = subjectAssignmentRepository;
+        this.accessScopeService = accessScopeService;
     }
 
     @Transactional
-    public ExamResponse createExam(CreateExamRequest request, UUID actorId) {
+    public ExamResponse createExam(CreateExamRequest request, UUID actorId, PlatformRole actorRole) {
         UUID tenantId = tenantAccessService.requireTenant();
+        ensureTeacherCanManageSubject(actorRole, tenantId, actorId, request.classId(), request.subjectId());
         Exam exam = new Exam();
         exam.setTenantId(tenantId);
         exam.setName(request.name());
@@ -98,11 +112,20 @@ public class ExamService {
     }
 
     @Transactional
-    public ScoreResponse recordScore(RecordScoreRequest request, UUID actorId) {
+    public ScoreResponse recordScore(RecordScoreRequest request, UUID actorId, PlatformRole actorRole) {
         UUID tenantId = tenantAccessService.requireTenant();
+        Exam exam = examRepository.findByIdAndTenantId(request.examId(), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Exam not found."));
+        ensureTeacherCanManageSubject(actorRole, tenantId, actorId, exam.getClassId(), exam.getSubjectId());
+        if (request.score() < 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "Score cannot be negative.");
+        }
+        if (request.score() > exam.getMaxScore()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Score cannot be greater than the exam max score.");
+        }
         StudentScore score = new StudentScore();
         score.setTenantId(tenantId);
-        score.setExamId(request.examId());
+        score.setExamId(exam.getId());
         score.setStudentId(request.studentId());
         score.setScore(request.score());
         studentScoreRepository.save(score);
@@ -112,8 +135,26 @@ public class ExamService {
     }
 
     @Transactional(readOnly = true)
-    public List<RankingEntry> ranking(UUID classId) {
+    public List<ExamResponse> listExams(UUID actorId, PlatformRole actorRole) {
         UUID tenantId = tenantAccessService.requireTenant();
+        return examRepository.findAllByTenantId(tenantId).stream()
+                .filter(exam -> actorRole != PlatformRole.TEACHER
+                        || subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectIdAndTeacherId(
+                                tenantId,
+                                exam.getClassId(),
+                                exam.getSubjectId(),
+                                actorId
+                        ))
+                .map(exam -> new ExamResponse(exam.getId(), exam.getName(), exam.getSubjectId(), exam.getClassId(), exam.getTermId(), exam.getMaxScore()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankingEntry> ranking(UUID classId, AcadexUserPrincipal principal) {
+        UUID tenantId = tenantAccessService.requireTenant();
+        if (!accessScopeService.canAccessClass(tenantId, classId, principal)) {
+            throw new ResponseStatusException(FORBIDDEN, "You cannot view ranking for this class.");
+        }
         List<UUID> examIds = examRepository.findAllByTenantIdAndClassId(tenantId, classId).stream().map(Exam::getId).toList();
         Map<UUID, Double> totals = studentScoreRepository.findAll().stream()
                 .filter(item -> tenantId.equals(item.getTenantId()) && examIds.contains(item.getExamId()))
@@ -129,8 +170,11 @@ public class ExamService {
     }
 
     @Transactional(readOnly = true)
-    public ReportCardResponse reportCard(UUID studentId) {
+    public ReportCardResponse reportCard(UUID studentId, AcadexUserPrincipal principal) {
         UUID tenantId = tenantAccessService.requireTenant();
+        if (!accessScopeService.canAccessStudent(tenantId, studentId, principal)) {
+            throw new ResponseStatusException(FORBIDDEN, "You cannot view this report card.");
+        }
         List<StudentScore> scores = studentScoreRepository.findAllByTenantIdAndStudentId(tenantId, studentId);
         List<ReportCardRow> rows = scores.stream()
                 .map(score -> new ReportCardRow(score.getExamId(), score.getScore(), resolveGrade(tenantId, score.getScore())))
@@ -140,8 +184,8 @@ public class ExamService {
     }
 
     @Transactional(readOnly = true)
-    public byte[] reportCardPdf(UUID studentId) {
-        ReportCardResponse card = reportCard(studentId);
+    public byte[] reportCardPdf(UUID studentId, AcadexUserPrincipal principal) {
+        ReportCardResponse card = reportCard(studentId, principal);
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PDPage page = new PDPage();
             document.addPage(page);
@@ -174,5 +218,26 @@ public class ExamService {
                 .findFirst()
                 .map(GradingScheme::getLetterGrade)
                 .orElse("N/A");
+    }
+
+    private void ensureTeacherCanManageSubject(
+            PlatformRole actorRole,
+            UUID tenantId,
+            UUID actorId,
+            UUID classId,
+            UUID subjectId
+    ) {
+        if (actorRole != PlatformRole.TEACHER) {
+            return;
+        }
+        boolean assigned = subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectIdAndTeacherId(
+                tenantId,
+                classId,
+                subjectId,
+                actorId
+        );
+        if (!assigned) {
+            throw new ResponseStatusException(FORBIDDEN, "You are not assigned to teach this class for the selected subject.");
+        }
     }
 }

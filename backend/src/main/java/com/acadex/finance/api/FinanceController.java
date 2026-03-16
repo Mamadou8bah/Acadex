@@ -50,17 +50,17 @@ public class FinanceController {
     }
 
     @GetMapping("/students/{studentId}/outstanding")
-    public OutstandingResponse outstanding(@PathVariable UUID studentId) {
-        return financeService.outstanding(studentId);
+    public OutstandingResponse outstanding(@PathVariable UUID studentId, @AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return financeService.outstanding(studentId, principal);
     }
 
     @GetMapping("/students/{studentId}/payments")
-    public List<PaymentResponse> payments(@PathVariable UUID studentId) {
-        return financeService.paymentHistory(studentId);
+    public List<PaymentResponse> payments(@PathVariable UUID studentId, @AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return financeService.paymentHistory(studentId, principal);
     }
 
     @GetMapping("/reports/summary")
-    public FinancialReportResponse summary() {
-        return financeService.financialReport();
+    public FinancialReportResponse summary(@AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return financeService.financialReport(principal);
     }
 }

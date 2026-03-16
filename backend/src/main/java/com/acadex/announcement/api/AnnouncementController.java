@@ -26,9 +26,10 @@ public class AnnouncementController {
     @GetMapping
     public PageResponse<AnnouncementResponse> listAnnouncements(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal AcadexUserPrincipal principal
     ) {
-        return announcementService.listAnnouncements(page, size);
+        return announcementService.listAnnouncements(page, size, principal);
     }
 
     @PostMapping

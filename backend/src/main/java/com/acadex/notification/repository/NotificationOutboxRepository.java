@@ -10,4 +10,9 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
     long countByTenantId(UUID tenantId);
     List<NotificationOutbox> findTop10ByTenantIdOrderByCreatedAtDesc(UUID tenantId);
     List<NotificationOutbox> findTop20ByTenantIdAndChannelOrderByCreatedAtDesc(UUID tenantId, NotificationChannel channel);
+    List<NotificationOutbox> findTop20ByTenantIdAndRecipientUserIdAndChannelOrderByCreatedAtDesc(
+            UUID tenantId,
+            UUID recipientUserId,
+            NotificationChannel channel
+    );
 }

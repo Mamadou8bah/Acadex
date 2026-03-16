@@ -99,6 +99,24 @@ const fallbackSubjects: Subject[] = [
   { id: "sub-2", name: "English", code: "ENG101" }
 ];
 
+const fallbackSubjectAssignments: SubjectAssignment[] = [
+  { id: "assign-1", subjectId: mockSubjectId, teacherId: mockTeacherId, classId: mockClassId }
+];
+
+const fallbackTeacherAssignments: TeacherAssignment[] = [
+  {
+    assignmentId: "assign-1",
+    teacherId: mockTeacherId,
+    classId: mockClassId,
+    className: "Grade 10A",
+    levelName: "Senior Secondary 1",
+    classTeacher: true,
+    subjectId: mockSubjectId,
+    subjectName: "Mathematics",
+    subjectCode: "MTH101"
+  }
+];
+
 const fallbackEnrollments: Enrollment[] = [
   { id: "enr-1", studentId: mockStudentId, classId: mockClassId, academicYearId: mockYearId, status: "ACTIVE" }
 ];
@@ -119,6 +137,10 @@ const fallbackAttendanceReport: AttendanceReport = {
 const fallbackRanking: RankingEntry[] = [
   { studentId: mockStudentId, totalScore: 278, rank: 1 },
   { studentId: "stu-2", totalScore: 264, rank: 2 }
+];
+
+const fallbackExams: ExamItem[] = [
+  { id: mockExamId, name: "Second Term Mathematics Test", subjectId: mockSubjectId, classId: mockClassId, termId: mockTermId, maxScore: 100 }
 ];
 
 const fallbackReportCard: ReportCard = {
@@ -253,6 +275,18 @@ export interface SubjectAssignment {
   classId: string;
 }
 
+export interface TeacherAssignment {
+  assignmentId: string;
+  teacherId: string;
+  classId: string;
+  className: string;
+  levelName: string;
+  classTeacher: boolean;
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string;
+}
+
 export interface AttendanceRecord {
   id: string;
   studentId: string;
@@ -274,6 +308,15 @@ export interface RankingEntry {
   studentId: string;
   totalScore: number;
   rank: number;
+}
+
+export interface ExamItem {
+  id: string;
+  name: string;
+  subjectId: string;
+  classId: string;
+  termId: string;
+  maxScore: number;
 }
 
 export interface ReportCardRow {
@@ -353,7 +396,11 @@ export function fetchSchools(session: Session) {
 }
 
 export function fetchUsers(session: Session) {
-  return withFallback(() => apiRequest<AuthUser[]>({ path: "/users", ...auth(session) }), fallbackUsers);
+  return withFallback(() => apiRequest<PageResponse<AuthUser>>({ path: "/users?page=0&size=200", ...auth(session) }).then((page) => page.content), fallbackUsers);
+}
+
+export function fetchVisibleUsers(session: Session) {
+  return withFallback(() => apiRequest<AuthUser[]>({ path: "/users/visible", ...auth(session) }), fallbackUsers);
 }
 
 export function createUser(
@@ -436,6 +483,14 @@ export function assignSubject(session: Session, payload: { subjectId: string; te
   });
 }
 
+export function fetchSubjectAssignments(session: Session) {
+  return withFallback(() => apiRequest<SubjectAssignment[]>({ path: "/academic/subject-assignments", ...auth(session) }), fallbackSubjectAssignments);
+}
+
+export function fetchMySubjectAssignments(session: Session) {
+  return withFallback(() => apiRequest<TeacherAssignment[]>({ path: "/academic/subject-assignments/me", ...auth(session) }), fallbackTeacherAssignments);
+}
+
 export function fetchEnrollments(session: Session) {
   return withFallback(() => apiRequest<Enrollment[]>({ path: "/academic/enrollments", ...auth(session) }), fallbackEnrollments);
 }
@@ -467,6 +522,10 @@ export function createExam(
   payload: { name: string; subjectId: string; classId: string; termId: string; maxScore: number; examDate: string }
 ) {
   return apiRequest({ path: "/exams", method: "POST", body: JSON.stringify(payload), ...auth(session) });
+}
+
+export function fetchExams(session: Session) {
+  return withFallback(() => apiRequest<ExamItem[]>({ path: "/exams", ...auth(session) }), fallbackExams);
 }
 
 export function createGradingScheme(

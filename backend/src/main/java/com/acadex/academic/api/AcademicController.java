@@ -11,6 +11,7 @@ import com.acadex.academic.api.AcademicResponses.EnrollmentResponse;
 import com.acadex.academic.api.AcademicResponses.SchoolClassResponse;
 import com.acadex.academic.api.AcademicResponses.SubjectAssignmentResponse;
 import com.acadex.academic.api.AcademicResponses.SubjectResponse;
+import com.acadex.academic.api.AcademicResponses.TeacherAssignmentResponse;
 import com.acadex.academic.api.AcademicResponses.TermResponse;
 import com.acadex.academic.service.AcademicService;
 import com.acadex.auth.security.AcadexUserPrincipal;
@@ -80,6 +81,16 @@ public class AcademicController {
 
     @GetMapping("/subjects")
     public List<SubjectResponse> subjects() { return academicService.listSubjects(); }
+
+    @GetMapping("/subject-assignments")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN') or hasRole('SUPER_ADMIN')")
+    public List<SubjectAssignmentResponse> subjectAssignments() { return academicService.listSubjectAssignments(); }
+
+    @GetMapping("/subject-assignments/me")
+    @PreAuthorize("hasRole('TEACHER')")
+    public List<TeacherAssignmentResponse> mySubjectAssignments(@AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return academicService.listTeacherAssignments(principal.getUserId());
+    }
 
     @GetMapping("/enrollments")
     public List<EnrollmentResponse> enrollments() { return academicService.listEnrollments(); }

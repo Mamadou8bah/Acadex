@@ -1,8 +1,10 @@
 package com.acadex.notification.api;
 
+import com.acadex.auth.security.AcadexUserPrincipal;
 import com.acadex.notification.service.NotificationService;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,8 +22,8 @@ public class NotificationController {
     }
 
     @GetMapping("/in-app")
-    public List<NotificationResponse> recentInApp() {
-        return notificationService.recentInApp();
+    public List<NotificationResponse> recentInApp(@AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return notificationService.recentInApp(principal);
     }
 
     @PostMapping("/in-app")

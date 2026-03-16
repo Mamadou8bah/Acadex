@@ -7,9 +7,11 @@ import com.acadex.attendance.model.AttendanceRecord;
 import com.acadex.attendance.model.AttendanceStatus;
 import com.acadex.attendance.repository.AttendanceRecordRepository;
 import com.acadex.audit.service.AuditService;
+import com.acadex.auth.security.AcadexUserPrincipal;
 import com.acadex.feature.model.FeatureFlag;
 import com.acadex.feature.service.FeatureAccessService;
 import com.acadex.notification.service.NotificationService;
+import com.acadex.security.AccessScopeService;
 import com.acadex.school.model.School;
 import com.acadex.school.repository.SchoolRepository;
 import com.acadex.tenant.TenantAccessService;
@@ -23,6 +25,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Service
 public class AttendanceService {
@@ -34,6 +38,7 @@ public class AttendanceService {
     private final FeatureAccessService featureAccessService;
     private final UserAccountRepository userAccountRepository;
     private final NotificationService notificationService;
+    private final AccessScopeService accessScopeService;
 
     public AttendanceService(
             TenantAccessService tenantAccessService,
@@ -42,7 +47,8 @@ public class AttendanceService {
             SchoolRepository schoolRepository,
             FeatureAccessService featureAccessService,
             UserAccountRepository userAccountRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            AccessScopeService accessScopeService
     ) {
         this.tenantAccessService = tenantAccessService;
         this.attendanceRecordRepository = attendanceRecordRepository;
@@ -51,20 +57,24 @@ public class AttendanceService {
         this.featureAccessService = featureAccessService;
         this.userAccountRepository = userAccountRepository;
         this.notificationService = notificationService;
+        this.accessScopeService = accessScopeService;
     }
 
     @Transactional
-    public AttendanceRecordResponse markAttendance(MarkAttendanceRequest request, UUID actorId) {
+    public AttendanceRecordResponse markAttendance(MarkAttendanceRequest request, AcadexUserPrincipal principal) {
         UUID tenantId = tenantAccessService.requireTenant();
+        if (!accessScopeService.canAccessClass(tenantId, request.classId(), principal)) {
+            throw new ResponseStatusException(FORBIDDEN, "You cannot manage attendance for this class.");
+        }
         AttendanceRecord record = new AttendanceRecord();
         record.setTenantId(tenantId);
         record.setStudentId(request.studentId());
         record.setClassId(request.classId());
         record.setAttendanceDate(request.attendanceDate());
         record.setStatus(request.status());
-        record.setMarkedByUserId(actorId);
+        record.setMarkedByUserId(principal.getUserId());
         attendanceRecordRepository.save(record);
-        auditService.log(tenantId, actorId, "ATTENDANCE_MARKED", "AttendanceRecord", record.getId().toString(), request.status().name());
+        auditService.log(tenantId, principal.getUserId(), "ATTENDANCE_MARKED", "AttendanceRecord", record.getId().toString(), request.status().name());
 
         if (request.status() == AttendanceStatus.ABSENT) {
             School school = schoolRepository.findById(tenantId).orElseThrow();
@@ -80,16 +90,22 @@ public class AttendanceService {
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<AttendanceRecordResponse> history(UUID studentId) {
+    public java.util.List<AttendanceRecordResponse> history(UUID studentId, AcadexUserPrincipal principal) {
         UUID tenantId = tenantAccessService.requireTenant();
+        if (!accessScopeService.canAccessStudent(tenantId, studentId, principal)) {
+            throw new ResponseStatusException(FORBIDDEN, "You cannot view this student's attendance history.");
+        }
         return attendanceRecordRepository.findAllByTenantIdAndStudentIdOrderByAttendanceDateDesc(tenantId, studentId).stream()
                 .map(record -> new AttendanceRecordResponse(record.getId(), record.getStudentId(), record.getClassId(), record.getAttendanceDate(), record.getStatus(), record.getMarkedByUserId()))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public AttendanceReportResponse report(UUID classId, LocalDate startDate, LocalDate endDate) {
+    public AttendanceReportResponse report(UUID classId, LocalDate startDate, LocalDate endDate, AcadexUserPrincipal principal) {
         UUID tenantId = tenantAccessService.requireTenant();
+        if (!accessScopeService.canAccessClass(tenantId, classId, principal)) {
+            throw new ResponseStatusException(FORBIDDEN, "You cannot view attendance for this class.");
+        }
         java.util.List<AttendanceRecord> records = attendanceRecordRepository.findAllByTenantIdAndClassIdAndAttendanceDateBetween(tenantId, classId, startDate, endDate);
         Map<AttendanceStatus, Long> grouped = Arrays.stream(AttendanceStatus.values())
                 .collect(Collectors.toMap(Function.identity(), status -> records.stream().filter(item -> item.getStatus() == status).count()));

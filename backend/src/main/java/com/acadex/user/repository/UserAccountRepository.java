@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
     Optional<UserAccount> findByEmail(String email);
+    Optional<UserAccount> findByIdAndTenantId(UUID id, UUID tenantId);
     List<UserAccount> findAllByTenantId(UUID tenantId);
     long countByTenantId(UUID tenantId);
     Page<UserAccount> findAllByTenantId(UUID tenantId, Pageable pageable);

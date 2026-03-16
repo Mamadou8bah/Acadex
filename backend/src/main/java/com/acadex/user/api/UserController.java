@@ -39,6 +39,11 @@ public class UserController {
         return userService.listUsers(page, size);
     }
 
+    @GetMapping("/visible")
+    public java.util.List<UserResponse> visibleUsers(@AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return userService.listVisibleUsers(principal);
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('SCHOOL_ADMIN') or hasRole('SUPER_ADMIN')")
     public UserResponse createUser(

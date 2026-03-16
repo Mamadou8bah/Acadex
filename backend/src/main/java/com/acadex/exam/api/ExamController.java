@@ -35,7 +35,7 @@ public class ExamController {
     @PostMapping
     @PreAuthorize("hasRole('TEACHER') or hasRole('SCHOOL_ADMIN') or hasRole('SUPER_ADMIN')")
     public ExamResponse createExam(@RequestBody CreateExamRequest request, @AuthenticationPrincipal AcadexUserPrincipal principal) {
-        return examService.createExam(request, principal.getUserId());
+        return examService.createExam(request, principal.getUserId(), principal.getRole());
     }
 
     @PostMapping("/grading-schemes")
@@ -47,21 +47,27 @@ public class ExamController {
     @PostMapping("/scores")
     @PreAuthorize("hasRole('TEACHER') or hasRole('SCHOOL_ADMIN') or hasRole('SUPER_ADMIN')")
     public ScoreResponse recordScore(@RequestBody RecordScoreRequest request, @AuthenticationPrincipal AcadexUserPrincipal principal) {
-        return examService.recordScore(request, principal.getUserId());
+        return examService.recordScore(request, principal.getUserId(), principal.getRole());
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('TEACHER') or hasRole('SCHOOL_ADMIN') or hasRole('SUPER_ADMIN')")
+    public List<ExamResponse> exams(@AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return examService.listExams(principal.getUserId(), principal.getRole());
     }
 
     @GetMapping("/classes/{classId}/ranking")
-    public List<RankingEntry> ranking(@PathVariable UUID classId) {
-        return examService.ranking(classId);
+    public List<RankingEntry> ranking(@PathVariable UUID classId, @AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return examService.ranking(classId, principal);
     }
 
     @GetMapping("/students/{studentId}/report-card")
-    public ReportCardResponse reportCard(@PathVariable UUID studentId) {
-        return examService.reportCard(studentId);
+    public ReportCardResponse reportCard(@PathVariable UUID studentId, @AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return examService.reportCard(studentId, principal);
     }
 
     @GetMapping(value = "/students/{studentId}/report-card/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    public byte[] reportCardPdf(@PathVariable UUID studentId) {
-        return examService.reportCardPdf(studentId);
+    public byte[] reportCardPdf(@PathVariable UUID studentId, @AuthenticationPrincipal AcadexUserPrincipal principal) {
+        return examService.reportCardPdf(studentId, principal);
     }
 }

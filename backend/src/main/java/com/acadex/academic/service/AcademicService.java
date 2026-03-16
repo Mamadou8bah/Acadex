@@ -11,6 +11,7 @@ import com.acadex.academic.api.AcademicResponses.EnrollmentResponse;
 import com.acadex.academic.api.AcademicResponses.SchoolClassResponse;
 import com.acadex.academic.api.AcademicResponses.SubjectAssignmentResponse;
 import com.acadex.academic.api.AcademicResponses.SubjectResponse;
+import com.acadex.academic.api.AcademicResponses.TeacherAssignmentResponse;
 import com.acadex.academic.api.AcademicResponses.TermResponse;
 import com.acadex.academic.model.AcademicYear;
 import com.acadex.academic.model.SchoolClass;
@@ -26,10 +27,16 @@ import com.acadex.academic.repository.SubjectRepository;
 import com.acadex.academic.repository.TermRepository;
 import com.acadex.audit.service.AuditService;
 import com.acadex.tenant.TenantAccessService;
+import com.acadex.user.model.PlatformRole;
+import com.acadex.user.model.UserAccount;
+import com.acadex.user.repository.UserAccountRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 public class AcademicService {
@@ -42,6 +49,7 @@ public class AcademicService {
     private final SubjectRepository subjectRepository;
     private final SubjectAssignmentRepository subjectAssignmentRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
+    private final UserAccountRepository userAccountRepository;
 
     public AcademicService(
             TenantAccessService tenantAccessService,
@@ -51,7 +59,8 @@ public class AcademicService {
             SchoolClassRepository schoolClassRepository,
             SubjectRepository subjectRepository,
             SubjectAssignmentRepository subjectAssignmentRepository,
-            StudentEnrollmentRepository studentEnrollmentRepository
+            StudentEnrollmentRepository studentEnrollmentRepository,
+            UserAccountRepository userAccountRepository
     ) {
         this.tenantAccessService = tenantAccessService;
         this.auditService = auditService;
@@ -61,6 +70,7 @@ public class AcademicService {
         this.subjectRepository = subjectRepository;
         this.subjectAssignmentRepository = subjectAssignmentRepository;
         this.studentEnrollmentRepository = studentEnrollmentRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     @Transactional
@@ -119,6 +129,18 @@ public class AcademicService {
     @Transactional
     public SubjectAssignmentResponse assignSubject(AssignSubjectRequest request, UUID actorId) {
         UUID tenantId = tenantAccessService.requireTenant();
+        Subject subject = subjectRepository.findByIdAndTenantId(request.subjectId(), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Subject not found."));
+        SchoolClass schoolClass = schoolClassRepository.findByIdAndTenantId(request.classId(), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Class not found."));
+        UserAccount teacher = userAccountRepository.findByIdAndTenantId(request.teacherId(), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Teacher not found."));
+        if (teacher.getRole() != PlatformRole.TEACHER) {
+            throw new ResponseStatusException(BAD_REQUEST, "Only teachers can receive subject assignments.");
+        }
+        if (subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectId(tenantId, request.classId(), request.subjectId())) {
+            throw new ResponseStatusException(BAD_REQUEST, "This class already has a teacher assigned for the subject.");
+        }
         SubjectAssignment entity = new SubjectAssignment();
         entity.setTenantId(tenantId);
         entity.setSubjectId(request.subjectId());
@@ -126,7 +148,7 @@ public class AcademicService {
         entity.setClassId(request.classId());
         subjectAssignmentRepository.save(entity);
         auditService.log(tenantId, actorId, "SUBJECT_ASSIGNED", "SubjectAssignment", entity.getId().toString(), entity.getSubjectId().toString());
-        return new SubjectAssignmentResponse(entity.getId(), entity.getSubjectId(), entity.getTeacherId(), entity.getClassId());
+        return new SubjectAssignmentResponse(entity.getId(), subject.getId(), teacher.getId(), schoolClass.getId());
     }
 
     @Transactional
@@ -180,5 +202,50 @@ public class AcademicService {
         return studentEnrollmentRepository.findAllByTenantId(tenantId).stream()
                 .map(entity -> new EnrollmentResponse(entity.getId(), entity.getStudentId(), entity.getClassId(), entity.getAcademicYearId(), entity.getStatus()))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SubjectAssignmentResponse> listSubjectAssignments() {
+        UUID tenantId = tenantAccessService.requireTenant();
+        return subjectAssignmentRepository.findAllByTenantId(tenantId).stream()
+                .map(entity -> new SubjectAssignmentResponse(entity.getId(), entity.getSubjectId(), entity.getTeacherId(), entity.getClassId()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TeacherAssignmentResponse> listTeacherAssignments(UUID teacherId) {
+        UUID tenantId = tenantAccessService.requireTenant();
+        List<SchoolClass> classes = schoolClassRepository.findAllByTenantId(tenantId);
+        List<Subject> subjects = subjectRepository.findAllByTenantId(tenantId);
+        return subjectAssignmentRepository.findAllByTenantIdAndTeacherId(tenantId, teacherId).stream()
+                .map(assignment -> toTeacherAssignmentResponse(assignment, classes, subjects))
+                .toList();
+    }
+
+    private TeacherAssignmentResponse toTeacherAssignmentResponse(
+            SubjectAssignment assignment,
+            List<SchoolClass> classes,
+            List<Subject> subjects
+    ) {
+        SchoolClass schoolClass = classes.stream()
+                .filter(item -> item.getId().equals(assignment.getClassId()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Assigned class no longer exists."));
+        Subject subject = subjects.stream()
+                .filter(item -> item.getId().equals(assignment.getSubjectId()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Assigned subject no longer exists."));
+        boolean isClassTeacher = assignment.getTeacherId().equals(schoolClass.getClassTeacherId());
+        return new TeacherAssignmentResponse(
+                assignment.getId(),
+                assignment.getTeacherId(),
+                schoolClass.getId(),
+                schoolClass.getName(),
+                schoolClass.getLevelName(),
+                isClassTeacher,
+                subject.getId(),
+                subject.getName(),
+                subject.getCode()
+        );
     }
 }

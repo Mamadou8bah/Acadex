@@ -39,6 +39,28 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, Object> handleIllegalArgument(IllegalArgumentException ex) {
+        LOGGER.warn("Bad request", ex);
+        return Map.of(
+                "timestamp", OffsetDateTime.now(),
+                "status", HttpStatus.BAD_REQUEST.value(),
+                "message", ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public Map<String, Object> handleIllegalState(IllegalStateException ex) {
+        LOGGER.error("Service dependency unavailable", ex);
+        return Map.of(
+                "timestamp", OffsetDateTime.now(),
+                "status", HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "message", ex.getMessage()
+        );
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public Map<String, Object> handleAccessDenied(AccessDeniedException ex) {

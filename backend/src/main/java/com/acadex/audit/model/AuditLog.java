@@ -10,7 +10,7 @@ import java.util.UUID;
 @Table(name = "audit_logs")
 public class AuditLog extends BaseEntity {
 
-    @Column(nullable = false)
+    @Column
     private UUID tenantId;
 
     @Column(nullable = false)

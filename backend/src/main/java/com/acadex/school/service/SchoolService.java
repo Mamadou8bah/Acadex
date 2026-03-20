@@ -1,6 +1,9 @@
 package com.acadex.school.service;
 
+import com.acadex.academic.repository.SchoolClassRepository;
+import com.acadex.academic.repository.StudentEnrollmentRepository;
 import com.acadex.announcement.repository.AnnouncementRepository;
+import com.acadex.audit.service.AuditService;
 import com.acadex.common.api.PageResponse;
 import com.acadex.feature.service.FeatureAccessService;
 import com.acadex.notification.repository.NotificationOutboxRepository;
@@ -28,19 +31,28 @@ public class SchoolService {
     private final UserAccountRepository userAccountRepository;
     private final AnnouncementRepository announcementRepository;
     private final NotificationOutboxRepository notificationOutboxRepository;
+    private final SchoolClassRepository schoolClassRepository;
+    private final StudentEnrollmentRepository studentEnrollmentRepository;
+    private final AuditService auditService;
 
     public SchoolService(
             SchoolRepository schoolRepository,
             FeatureAccessService featureAccessService,
             UserAccountRepository userAccountRepository,
             AnnouncementRepository announcementRepository,
-            NotificationOutboxRepository notificationOutboxRepository
+            NotificationOutboxRepository notificationOutboxRepository,
+            SchoolClassRepository schoolClassRepository,
+            StudentEnrollmentRepository studentEnrollmentRepository,
+            AuditService auditService
     ) {
         this.schoolRepository = schoolRepository;
         this.featureAccessService = featureAccessService;
         this.userAccountRepository = userAccountRepository;
         this.announcementRepository = announcementRepository;
         this.notificationOutboxRepository = notificationOutboxRepository;
+        this.schoolClassRepository = schoolClassRepository;
+        this.studentEnrollmentRepository = studentEnrollmentRepository;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -59,6 +71,11 @@ public class SchoolService {
     @CacheEvict(value = {"platform-schools", "analytics-summary"}, allEntries = true)
     public SchoolResponse updateSchool(UUID schoolId, UpdateSchoolRequest request) {
         School school = schoolRepository.findById(schoolId).orElseThrow();
+        var previousFeatures = school.getEnabledFeatures() == null
+                ? java.util.Set.<com.acadex.feature.model.FeatureFlag>of()
+                : java.util.Set.copyOf(school.getEnabledFeatures());
+        var previousPlan = school.getSubscriptionPlan();
+        var previousStatus = school.getStatus();
         school.setName(request.name());
         school.setSlug(request.slug());
         school.setContactEmail(request.contactEmail());
@@ -72,6 +89,15 @@ public class SchoolService {
             school.setEnabledFeatures(request.enabledFeatures());
         }
         featureAccessService.validateEnabledFeatures(school);
+        if (!previousFeatures.equals(school.getEnabledFeatures())) {
+            auditService.log(school.getId(), school.getId(), "FEATURE_ENABLEMENT_CHANGED", "School", school.getId().toString(), school.getEnabledFeatures().toString());
+        }
+        if (previousPlan != school.getSubscriptionPlan()) {
+            auditService.log(school.getId(), school.getId(), "SUBSCRIPTION_PLAN_CHANGED", "School", school.getId().toString(), school.getSubscriptionPlan().name());
+        }
+        if (previousStatus != school.getStatus()) {
+            auditService.log(school.getId(), school.getId(), "SCHOOL_STATUS_CHANGED", "School", school.getId().toString(), school.getStatus().name());
+        }
         return map(school);
     }
 
@@ -95,8 +121,8 @@ public class SchoolService {
                 userAccountRepository.countByTenantId(schoolId),
                 announcementRepository.findAllByTenantIdOrderByPublishAtDesc(schoolId).size(),
                 notificationOutboxRepository.countByTenantId(schoolId),
-                0,
-                0
+                schoolClassRepository.countByTenantId(schoolId),
+                studentEnrollmentRepository.countByTenantId(schoolId)
         );
     }
 

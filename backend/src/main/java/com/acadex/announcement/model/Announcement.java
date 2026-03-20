@@ -26,6 +26,9 @@ public class Announcement extends TenantScopedEntity {
     @Column(nullable = false)
     private AnnouncementAudience audience;
 
+    @Column
+    private UUID classId;
+
     @Column(nullable = false)
     private OffsetDateTime publishAt;
 
@@ -59,6 +62,14 @@ public class Announcement extends TenantScopedEntity {
 
     public void setAudience(AnnouncementAudience audience) {
         this.audience = audience;
+    }
+
+    public UUID getClassId() {
+        return classId;
+    }
+
+    public void setClassId(UUID classId) {
+        this.classId = classId;
     }
 
     public OffsetDateTime getPublishAt() {

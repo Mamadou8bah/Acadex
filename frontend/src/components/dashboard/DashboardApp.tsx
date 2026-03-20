@@ -27,6 +27,7 @@ import {
   fetchVisibleUsers,
   markAttendance,
   recordScore,
+  uploadManagedFile,
   updateSchool,
   validateFileUpload
 } from "../../features/platform/api";
@@ -46,6 +47,9 @@ interface UploadItem {
   name: string;
   size: number;
   contentType: string;
+  provider: "CLOUDINARY" | "UPLOADTHING";
+  url: string;
+  fileKey: string;
 }
 
 interface StudentSummary {
@@ -255,7 +259,10 @@ function HorizontalComparisonChart({
 function UploadChip({ item }: { item: UploadItem }) {
   return (
     <div className="flex items-center justify-between rounded-2xl bg-sand/60 px-4 py-3 text-sm">
-      <span className="truncate pr-3 text-black/85">{item.name}</span>
+      <div className="min-w-0 pr-3">
+        <span className="block truncate text-black/85">{item.name}</span>
+        <span className="block text-xs uppercase tracking-[0.16em] text-black/45">{item.provider}</span>
+      </div>
       <span className="whitespace-nowrap text-black/55">{bytes(item.size)}</span>
     </div>
   );
@@ -715,22 +722,36 @@ export function DashboardApp() {
     if (!files?.length) return;
 
     try {
-      const validated = await Promise.all(
+      const uploaded = await Promise.all(
         Array.from(files).map(async (file) => {
           const result = await validateFileUpload(session, file);
-          return { name: file.name, size: result.size, contentType: result.contentType };
+          const uploadBucket =
+            bucket === "schoolLogo"
+              ? "school-logo"
+              : bucket === "studentPhoto"
+                ? "student-photo"
+                : "student-document";
+          const stored = await uploadManagedFile(session, file, uploadBucket);
+          return {
+            name: file.name,
+            size: result.size,
+            contentType: result.contentType,
+            provider: stored.provider,
+            url: stored.url,
+            fileKey: stored.fileKey
+          };
         })
       );
 
       if (bucket === "schoolLogo") {
-        setSchoolLogo(validated[0] ?? null);
+        setSchoolLogo(uploaded[0] ?? null);
       } else if (bucket === "studentPhoto") {
-        setStudentPhoto(validated[0] ?? null);
+        setStudentPhoto(uploaded[0] ?? null);
       } else {
-        setStudentDocuments(validated);
+        setStudentDocuments(uploaded);
       }
 
-      setFlash("Files validated and ready for onboarding.");
+      setFlash("Files uploaded successfully and linked to this draft session.");
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "File validation failed.");

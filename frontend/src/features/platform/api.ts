@@ -65,16 +65,24 @@ const fallbackDashboard: DashboardAnalytics = {
   classesCount: 18,
   presentAttendanceRecords: 392,
   absentAttendanceRecords: 29,
+  lateAttendanceRecords: 11,
   totalInvoiced: 125000,
   totalCollected: 101500,
+  outstandingBalance: 23500,
+  feeCollectionRate: 81.2,
   examsCount: 14,
-  teacherAssignments: 36
+  teacherAssignments: 36,
+  averageScore: 74.8,
+  scoredStudents: 201,
+  recentEnrollmentCount: 34,
+  teachersWithAssignments: 12,
+  averageAssignmentsPerTeacher: 3
 };
 
 const fallbackAnnouncements: PageResponse<Announcement> = {
   content: [
-    { id: "ann-1", tenantId: mockTenantId, authorId: mockTeacherId, title: "Midterm Timetable Released", content: "All classes can now review the midterm schedule.", audience: "SCHOOL_WIDE", publishAt: "2026-03-14T10:00:00Z" },
-    { id: "ann-2", tenantId: mockTenantId, authorId: mockTeacherId, title: "Parent Conference", content: "Parents are invited for a performance review session next week.", audience: "PARENTS", publishAt: "2026-03-10T10:00:00Z" }
+    { id: "ann-1", tenantId: mockTenantId, authorId: mockTeacherId, title: "Midterm Timetable Released", content: "All classes can now review the midterm schedule.", audience: "SCHOOL_WIDE", classId: null, publishAt: "2026-03-14T10:00:00Z" },
+    { id: "ann-2", tenantId: mockTenantId, authorId: mockTeacherId, title: "Parent Conference", content: "Parents are invited for a performance review session next week.", audience: "PARENTS", classId: null, publishAt: "2026-03-10T10:00:00Z" }
   ],
   page: 0,
   size: 20,
@@ -227,10 +235,18 @@ export interface DashboardAnalytics {
   classesCount: number;
   presentAttendanceRecords: number;
   absentAttendanceRecords: number;
+  lateAttendanceRecords: number;
   totalInvoiced: number;
   totalCollected: number;
+  outstandingBalance: number;
+  feeCollectionRate: number;
   examsCount: number;
   teacherAssignments: number;
+  averageScore: number;
+  scoredStudents: number;
+  recentEnrollmentCount: number;
+  teachersWithAssignments: number;
+  averageAssignmentsPerTeacher: number;
 }
 
 export interface AcademicYear {
@@ -389,6 +405,16 @@ export interface FileValidationResult {
   contentType: string;
 }
 
+export interface UploadedAsset {
+  provider: "CLOUDINARY" | "UPLOADTHING";
+  bucket: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+  fileKey: string;
+  url: string;
+}
+
 function auth(session: Session) {
   return {
     accessToken: session.accessToken,
@@ -434,7 +460,7 @@ export function fetchAnnouncements(session: Session) {
 
 export function createAnnouncement(
   session: Session,
-  payload: { title: string; content: string; audience: string; publishAt?: string }
+  payload: { title: string; content: string; audience: string; classId?: string; publishAt?: string }
 ) {
   return apiRequest<Announcement>({
     path: "/announcements",
@@ -664,5 +690,37 @@ export function validateFileUpload(session: Session, file: File) {
       message: "Validated in demo mode",
       size: file.size,
       contentType: file.type || "application/octet-stream"
+    }));
+}
+
+export function uploadManagedFile(session: Session, file: File, bucket: string): Promise<UploadedAsset> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("bucket", bucket);
+
+  return fetch("http://localhost:8080/api/v1/files/upload", {
+    method: "POST",
+    body,
+    headers: {
+      ...(session.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+      ...(session.tenantId ? { "X-Tenant-Id": session.tenantId } : {})
+    }
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Upload failed.");
+      }
+
+      return response.json() as Promise<UploadedAsset>;
+    })
+    .catch(() => ({
+      provider: file.type.startsWith("image/") ? "CLOUDINARY" : "UPLOADTHING",
+      bucket,
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+      size: file.size,
+      fileKey: `demo-${bucket}-${file.name}`,
+      url: `https://demo.acadex.local/${bucket}/${encodeURIComponent(file.name)}`
     }));
 }

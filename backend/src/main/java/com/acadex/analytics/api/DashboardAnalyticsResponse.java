@@ -5,9 +5,17 @@ public record DashboardAnalyticsResponse(
         long classesCount,
         long presentAttendanceRecords,
         long absentAttendanceRecords,
+        long lateAttendanceRecords,
         double totalInvoiced,
         double totalCollected,
+        double outstandingBalance,
+        double feeCollectionRate,
         long examsCount,
-        long teacherAssignments
+        long teacherAssignments,
+        double averageScore,
+        long scoredStudents,
+        long recentEnrollmentCount,
+        long teachersWithAssignments,
+        double averageAssignmentsPerTeacher
 ) {
 }

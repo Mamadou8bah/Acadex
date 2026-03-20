@@ -51,6 +51,7 @@ public class AuthService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final AuthenticationManager authenticationManager;
+    private final AuthAuditService authAuditService;
 
     public AuthService(
             UserAccountRepository userAccountRepository,
@@ -61,7 +62,8 @@ public class AuthService {
             JwtService jwtService,
             EmailService emailService,
             AuditService auditService,
-            AuthenticationManager authenticationManager
+            AuthenticationManager authenticationManager,
+            AuthAuditService authAuditService
     ) {
         this.userAccountRepository = userAccountRepository;
         this.schoolRepository = schoolRepository;
@@ -72,6 +74,7 @@ public class AuthService {
         this.emailService = emailService;
         this.auditService = auditService;
         this.authenticationManager = authenticationManager;
+        this.authAuditService = authAuditService;
     }
 
     @Transactional
@@ -107,14 +110,21 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
-        );
-        AcadexUserPrincipal principal = (AcadexUserPrincipal) authentication.getPrincipal();
-        UserAccount user = userAccountRepository.findByEmail(principal.getUsername())
-                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
+        UserAccount user;
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.email(), request.password())
+            );
+            AcadexUserPrincipal principal = (AcadexUserPrincipal) authentication.getPrincipal();
+            user = userAccountRepository.findByEmail(principal.getUsername())
+                    .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
+        } catch (BadCredentialsException ex) {
+            authAuditService.logFailedLogin(request.email(), "Invalid credentials");
+            throw ex;
+        }
 
         if (!user.isEmailVerified()) {
+            authAuditService.logFailedLogin(request.email(), "Email not verified");
             throw new BadCredentialsException("Email not verified");
         }
 

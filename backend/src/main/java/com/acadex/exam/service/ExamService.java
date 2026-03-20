@@ -139,7 +139,7 @@ public class ExamService {
         UUID tenantId = tenantAccessService.requireTenant();
         return examRepository.findAllByTenantId(tenantId).stream()
                 .filter(exam -> actorRole != PlatformRole.TEACHER
-                        || subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectIdAndTeacherId(
+                        || subjectAssignmentRepository.existsByTenantIdAndClassIdAndSubjectIdAndTermIdAndTeacherId(
                                 tenantId,
                                 exam.getClassId(),
                                 exam.getSubjectId(),

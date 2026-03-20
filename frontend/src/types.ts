@@ -57,6 +57,7 @@ export interface Announcement {
   title: string;
   content: string;
   audience: AnnouncementAudience;
+  classId: string | null;
   publishAt: string;
 }
 

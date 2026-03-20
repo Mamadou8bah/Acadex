@@ -9,12 +9,14 @@ import com.acadex.announcement.repository.AnnouncementRepository;
 import com.acadex.attendance.model.AttendanceStatus;
 import com.acadex.attendance.repository.AttendanceRecordRepository;
 import com.acadex.exam.repository.ExamRepository;
+import com.acadex.exam.repository.StudentScoreRepository;
 import com.acadex.finance.repository.InvoiceRepository;
 import com.acadex.finance.repository.PaymentRecordRepository;
 import com.acadex.notification.repository.NotificationOutboxRepository;
 import com.acadex.school.repository.SchoolRepository;
 import com.acadex.tenant.TenantAccessService;
 import com.acadex.user.repository.UserAccountRepository;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class AnalyticsService {
     private final PaymentRecordRepository paymentRecordRepository;
     private final ExamRepository examRepository;
     private final SubjectAssignmentRepository subjectAssignmentRepository;
+    private final StudentScoreRepository studentScoreRepository;
 
     public AnalyticsService(
             SchoolRepository schoolRepository,
@@ -48,7 +51,8 @@ public class AnalyticsService {
             InvoiceRepository invoiceRepository,
             PaymentRecordRepository paymentRecordRepository,
             ExamRepository examRepository,
-            SubjectAssignmentRepository subjectAssignmentRepository
+            SubjectAssignmentRepository subjectAssignmentRepository,
+            StudentScoreRepository studentScoreRepository
     ) {
         this.schoolRepository = schoolRepository;
         this.userAccountRepository = userAccountRepository;
@@ -62,6 +66,7 @@ public class AnalyticsService {
         this.paymentRecordRepository = paymentRecordRepository;
         this.examRepository = examRepository;
         this.subjectAssignmentRepository = subjectAssignmentRepository;
+        this.studentScoreRepository = studentScoreRepository;
     }
 
     @Transactional(readOnly = true)
@@ -84,15 +89,37 @@ public class AnalyticsService {
                 .filter(item -> tenantId.equals(item.getTenantId()))
                 .mapToDouble(item -> item.getAmount())
                 .sum();
+        long lateAttendance = attendanceRecordRepository.countByTenantIdAndStatus(tenantId, AttendanceStatus.LATE);
+        var assignments = subjectAssignmentRepository.findAllByTenantId(tenantId);
+        var scores = studentScoreRepository.findAll().stream()
+                .filter(item -> tenantId.equals(item.getTenantId()))
+                .toList();
+        double averageScore = scores.stream().mapToDouble(item -> item.getScore()).average().orElse(0);
+        long scoredStudents = scores.stream().map(item -> item.getStudentId()).distinct().count();
+        long recentEnrollmentCount = studentEnrollmentRepository.findAllByTenantId(tenantId).stream()
+                .filter(item -> item.getCreatedAt().isAfter(OffsetDateTime.now().minusDays(30)))
+                .count();
+        long teachersWithAssignments = assignments.stream().map(item -> item.getTeacherId()).distinct().count();
+        double averageAssignmentsPerTeacher = teachersWithAssignments == 0 ? 0 : (double) assignments.size() / teachersWithAssignments;
+        double outstandingBalance = invoiced - collected;
+        double feeCollectionRate = invoiced == 0 ? 0 : (collected / invoiced) * 100.0;
         return new DashboardAnalyticsResponse(
                 studentEnrollmentRepository.countByTenantId(tenantId),
                 schoolClassRepository.countByTenantId(tenantId),
                 attendanceRecordRepository.countByTenantIdAndStatus(tenantId, AttendanceStatus.PRESENT),
                 attendanceRecordRepository.countByTenantIdAndStatus(tenantId, AttendanceStatus.ABSENT),
+                lateAttendance,
                 invoiced,
                 collected,
+                outstandingBalance,
+                feeCollectionRate,
                 examRepository.findAll().stream().filter(item -> tenantId.equals(item.getTenantId())).count(),
-                subjectAssignmentRepository.findAllByTenantId(tenantId).size()
+                assignments.size(),
+                averageScore,
+                scoredStudents,
+                recentEnrollmentCount,
+                teachersWithAssignments,
+                averageAssignmentsPerTeacher
         );
     }
 }

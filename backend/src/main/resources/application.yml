@@ -62,3 +62,17 @@ resend:
 app:
   queues:
     notifications: acadex.notifications
+  scheduling:
+    fee-reminders: ${FEE_REMINDER_CRON:0 0 8 * * *}
+
+storage:
+  cloudinary:
+    cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+    api-key: ${CLOUDINARY_API_KEY:}
+    api-secret: ${CLOUDINARY_API_SECRET:}
+    folder: ${CLOUDINARY_FOLDER:acadex}
+  uploadthing:
+    token: ${UPLOADTHING_TOKEN:}
+    api-key: ${UPLOADTHING_API_KEY:}
+    app-id: ${UPLOADTHING_APP_ID:}
+    region: ${UPLOADTHING_REGION:sea1}

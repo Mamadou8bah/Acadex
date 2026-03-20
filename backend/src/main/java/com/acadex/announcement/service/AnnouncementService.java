@@ -55,6 +55,9 @@ public class AnnouncementService {
         var allowedAudiences = accessScopeService.allowedAudiences(principal.getRole());
         var visibleAnnouncements = announcements.getContent().stream()
                 .filter(item -> allowedAudiences.contains(item.getAudience()))
+                .filter(item -> item.getAudience() != AnnouncementAudience.CLASS_SPECIFIC
+                        || item.getClassId() == null
+                        || accessScopeService.canAccessClass(tenantId, item.getClassId(), principal))
                 .map(this::map)
                 .toList();
         return new PageResponse<>(
@@ -70,17 +73,30 @@ public class AnnouncementService {
     @CacheEvict(value = {"tenant-announcements", "analytics-summary"}, allEntries = true)
     public AnnouncementResponse createAnnouncement(CreateAnnouncementRequest request, UUID authorId) {
         UUID tenantId = tenantAccessService.requireTenant();
+        AnnouncementAudience audience = request.audience() == null ? AnnouncementAudience.SCHOOL_WIDE : request.audience();
+        if (audience == AnnouncementAudience.CLASS_SPECIFIC && request.classId() == null) {
+            throw new IllegalArgumentException("Class-specific announcements require a classId");
+        }
         Announcement announcement = new Announcement();
         announcement.setTenantId(tenantId);
         announcement.setAuthorId(authorId);
         announcement.setTitle(request.title());
         announcement.setContent(request.content());
-        announcement.setAudience(request.audience() == null ? AnnouncementAudience.SCHOOL_WIDE : request.audience());
+        announcement.setAudience(audience);
+        announcement.setClassId(request.classId());
         announcement.setPublishAt(request.publishAt() == null ? OffsetDateTime.now() : request.publishAt());
         announcement = announcementRepository.save(announcement);
         final Announcement savedAnnouncement = announcement;
 
-        userAccountRepository.findAllByTenantId(tenantId).forEach(user ->
+        userAccountRepository.findAllByTenantId(tenantId).stream()
+                .filter(user -> savedAnnouncement.getAudience() != AnnouncementAudience.CLASS_SPECIFIC
+                        || savedAnnouncement.getClassId() == null
+                        || accessScopeService.canAccessClass(
+                                tenantId,
+                                savedAnnouncement.getClassId(),
+                                new AcadexUserPrincipal(user)
+                        ))
+                .forEach(user ->
                 notificationService.queueEmail(
                         tenantId,
                         user.getId(),
@@ -100,6 +116,7 @@ public class AnnouncementService {
                 announcement.getTitle(),
                 announcement.getContent(),
                 announcement.getAudience(),
+                announcement.getClassId(),
                 announcement.getPublishAt()
         );
     }

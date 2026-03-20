@@ -47,7 +47,8 @@ export function CommsTab({
               <form className="space-y-3" onSubmit={(e) => handle(e, (fd) => createAnnouncement(session, {
                 title: String(fd.get("title")),
                 content: String(fd.get("content")),
-                audience: String(fd.get("audience"))
+                audience: String(fd.get("audience")),
+                classId: String(fd.get("classId") || "") || undefined
               }), ["announcements"], "Announcement created.")}>
                 <input className="w-full rounded-2xl border border-black/10 p-3" name="title" placeholder="Announcement title" />
                 <textarea className="w-full rounded-2xl border border-black/10 p-3" name="content" placeholder="Content" rows={4} />
@@ -58,6 +59,7 @@ export function CommsTab({
                   <option>PARENTS</option>
                   <option>CLASS_SPECIFIC</option>
                 </select>
+                <input className="w-full rounded-2xl border border-black/10 p-3" name="classId" placeholder="Class ID (required for class-specific)" />
                 <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create announcement</button>
               </form>
             ) : null}

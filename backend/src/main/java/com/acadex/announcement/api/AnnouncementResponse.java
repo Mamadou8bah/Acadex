@@ -11,6 +11,7 @@ public record AnnouncementResponse(
         String title,
         String content,
         AnnouncementAudience audience,
+        UUID classId,
         OffsetDateTime publishAt
 ) {
 }

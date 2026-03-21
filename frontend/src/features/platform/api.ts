@@ -493,7 +493,7 @@ export function fetchClasses(session: Session) {
   return withFallback(() => apiRequest<SchoolClass[]>({ path: "/academic/classes", ...auth(session) }), fallbackClasses);
 }
 
-export function createClass(session: Session, payload: { name: string; levelName: string; classTeacherId?: string }) {
+export function createClass(session: Session, payload: { name: string; levelName: string; classTeacherId: string }) {
   return apiRequest<SchoolClass>({ path: "/academic/classes", method: "POST", body: JSON.stringify(payload), ...auth(session) });
 }
 
@@ -505,7 +505,18 @@ export function createSubject(session: Session, payload: { name: string; code: s
   return apiRequest<Subject>({ path: "/academic/subjects", method: "POST", body: JSON.stringify(payload), ...auth(session) });
 }
 
-export function assignSubject(session: Session, payload: { subjectId: string; teacherId: string; classId: string; termId: string }) {
+export function assignSubject(
+  session: Session,
+  payload: {
+    subjectId: string;
+    teacherId: string;
+    classId: string;
+    termId: string;
+    testWeight: number;
+    assignmentWeight: number;
+    finalExamWeight: number;
+  }
+) {
   return apiRequest<SubjectAssignment>({
     path: "/academic/subject-assignments",
     method: "POST",

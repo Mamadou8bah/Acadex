@@ -4,7 +4,6 @@ import {
   assignSubject,
   createAcademicYear,
   createClass,
-  createExam,
   createGradingScheme,
   createSubject,
   createTerm,
@@ -85,10 +84,8 @@ export function AcademicTab({
   handleReportCardDownload
 }: AcademicTabProps) {
   const isAdmin = isSchoolAdmin || isSuperAdmin;
-  const [selectedTeachingAssignmentId, setSelectedTeachingAssignmentId] = useState<string>(teacherAssignments[0]?.assignmentId ?? "");
   const [selectedScoreExamId, setSelectedScoreExamId] = useState<string>(exams[0]?.id ?? "");
 
-  const selectedTeachingAssignment = teacherAssignments.find((item) => item.assignmentId === selectedTeachingAssignmentId) ?? teacherAssignments[0] ?? null;
   const selectedScoreExam = exams.find((item) => item.id === selectedScoreExamId) ?? exams[0] ?? null;
   const selectedScoreClassId = selectedScoreExam?.classId ?? "";
 
@@ -164,7 +161,7 @@ export function AcademicTab({
                   createClass(session, {
                     name: String(fd.get("name")),
                     levelName: String(fd.get("levelName")),
-                    classTeacherId: String(fd.get("classTeacherId") || "")
+                    classTeacherId: String(fd.get("classTeacherId"))
                   }),
                 ["classes"],
                 "Class created."
@@ -173,7 +170,7 @@ export function AcademicTab({
           >
             <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Class name" />
             <input className="w-full rounded-2xl border border-black/10 p-3" name="levelName" placeholder="Level" />
-            <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="classTeacherId">
+            <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="classTeacherId" required>
               <option value="">Select class teacher</option>
               {teacherUsers.map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
@@ -196,54 +193,9 @@ export function AcademicTab({
               `Exams tracked: ${dashboard?.examsCount ?? 0}`
             ]}
           />
-          <form
-            className="space-y-3"
-            onSubmit={(event) =>
-              handle(
-                event,
-                (fd) =>
-                  createExam(session, {
-                    name: String(fd.get("name")),
-                    subjectId: String(fd.get("subjectId")),
-                    classId: String(fd.get("classId")),
-                    termId: String(fd.get("termId")),
-                    maxScore: Number(fd.get("maxScore")),
-                    examDate: String(fd.get("examDate"))
-                  }),
-                ["dashboard", "exams"],
-                "Exam created."
-              )
-            }
-          >
-            <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Exam name" />
-            <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="subjectId">
-              <option value="">Select subject</option>
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
-                </option>
-              ))}
-            </select>
-            <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="classId">
-              <option value="">Select class</option>
-              {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name} ({schoolClass.levelName})
-                </option>
-              ))}
-            </select>
-            <select className="w-full rounded-2xl border border-black/10 p-3" defaultValue="" name="termId">
-              <option value="">Select term</option>
-              {terms.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.name}
-                </option>
-              ))}
-            </select>
-            <input className="w-full rounded-2xl border border-black/10 p-3" name="maxScore" placeholder="Max score" type="number" />
-            <input className="w-full rounded-2xl border border-black/10 p-3" name="examDate" type="date" />
-            <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create exam</button>
-          </form>
+          <p className="text-sm text-black/60">
+            Exams are now generated automatically as Test, Assignment, and Final Exam whenever a subject is assigned to a class for a term.
+          </p>
         </Panel>
 
         <Panel subtitle="Terms and subjects" title="Curriculum structure">
@@ -319,7 +271,10 @@ export function AcademicTab({
                     subjectId: String(fd.get("subjectId")),
                     teacherId: String(fd.get("teacherId")),
                     classId: String(fd.get("classId")),
-                    termId: String(fd.get("termId"))
+                    termId: String(fd.get("termId")),
+                    testWeight: Number(fd.get("testWeight")),
+                    assignmentWeight: Number(fd.get("assignmentWeight")),
+                    finalExamWeight: Number(fd.get("finalExamWeight"))
                   }),
                 ["dashboard", "subject-assignments"],
                 "Subject assigned."
@@ -358,6 +313,12 @@ export function AcademicTab({
                 </option>
               ))}
             </select>
+            <div className="grid gap-3 md:grid-cols-3">
+              <input className="rounded-2xl border border-black/10 p-3" defaultValue="20" min="1" name="testWeight" placeholder="Test weight" step="0.01" type="number" />
+              <input className="rounded-2xl border border-black/10 p-3" defaultValue="20" min="1" name="assignmentWeight" placeholder="Assignment weight" step="0.01" type="number" />
+              <input className="rounded-2xl border border-black/10 p-3" defaultValue="60" min="1" name="finalExamWeight" placeholder="Final exam weight" step="0.01" type="number" />
+            </div>
+            <p className="text-xs text-black/55">Weights must add up to 100.</p>
             <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Assign subject</button>
           </form>
 
@@ -460,7 +421,8 @@ export function AcademicTab({
             isTeacher
               ? [
                   "Teachers now see the subjects and classes assigned to them.",
-                  "Exam creation and grading are scoped to those assignments.",
+                  "Exam components are auto-created by admin setup (Test, Assignment, Final Exam).",
+                  "Grade entry is scoped to your assigned subjects.",
                   "School-wide setup actions remain restricted to administrators."
                 ]
               : [
@@ -472,58 +434,7 @@ export function AcademicTab({
       </Panel>
 
       {isTeacher ? (
-        <>
-          <Panel subtitle="Assessment setup" title="Create exam for your subject">
-            <form
-              className="space-y-3"
-              onSubmit={(event) =>
-                handle(
-                  event,
-                  (fd) => {
-                    const assignment = teacherAssignments.find((item) => item.assignmentId === String(fd.get("assignmentId")));
-                    if (!assignment) {
-                      return Promise.reject(new Error("Select a teaching assignment."));
-                    }
-                    return createExam(session, {
-                      name: String(fd.get("name")),
-                      subjectId: assignment.subjectId,
-                      classId: assignment.classId,
-                      termId: assignment.termId,
-                      maxScore: Number(fd.get("maxScore")),
-                      examDate: String(fd.get("examDate"))
-                    });
-                  },
-                  ["dashboard", "exams"],
-                  "Exam created."
-                )
-              }
-            >
-              <select
-                className="w-full rounded-2xl border border-black/10 p-3"
-                defaultValue={selectedTeachingAssignment?.assignmentId ?? ""}
-                name="assignmentId"
-                onChange={(event) => setSelectedTeachingAssignmentId(event.target.value)}
-              >
-                <option value="">Select class and subject</option>
-                {teacherAssignments.map((assignment) => (
-                  <option key={assignment.assignmentId} value={assignment.assignmentId}>
-                    {assignment.termName} - {assignment.className} - {assignment.subjectName}
-                  </option>
-                ))}
-              </select>
-              <input className="w-full rounded-2xl border border-black/10 p-3" name="name" placeholder="Exam name" />
-              <input className="w-full rounded-2xl border border-black/10 p-3" name="maxScore" placeholder="Max score" type="number" />
-              <input className="w-full rounded-2xl border border-black/10 p-3" name="examDate" type="date" />
-              {selectedTeachingAssignment ? (
-                <p className="text-sm text-black/55">
-                  Creating for {selectedTeachingAssignment.termName} • {selectedTeachingAssignment.className} • {selectedTeachingAssignment.subjectName}
-                </p>
-              ) : null}
-              <button className="rounded-full bg-ember px-5 py-3 text-sm font-semibold text-white" type="submit">Create exam</button>
-            </form>
-          </Panel>
-
-          <Panel subtitle="Grade entry" title="Record student scores">
+        <Panel subtitle="Grade entry" title="Record student scores">
             <form
               className="space-y-3"
               onSubmit={(event) =>
@@ -570,7 +481,6 @@ export function AcademicTab({
               <button className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white" type="submit">Record score</button>
             </form>
           </Panel>
-        </>
       ) : null}
 
       <Panel subtitle="Performance" title="Reports and ranking">
